@@ -211,11 +211,11 @@ module emu
 		"R0,Reset;",
 `ifndef STV_BUILD
 		"J1,A,B,C,Start,R,X,Y,Z,L,Coin;",
+		"jn,A,B,R2,Start,R,X,Y,L2,L,Select;",
+		"jp,A,B,R2,Start,R,X,Y,L2,L,Select;",
 `else
 		"J1,B1,B2,B3,B4,B5,B6,Start,Coin,Service,Test;",
 `endif
-//		"jn,A,B,R,Start,Select,X,Y,L;", 
-//		"jp,Y,B,A,Start,Select,L,X,R;",
 		"V,v",`BUILD_DATE
 	};
 
