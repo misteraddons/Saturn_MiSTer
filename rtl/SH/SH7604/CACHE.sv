@@ -13,6 +13,7 @@ module SH7604_CACHE (
 	input             CBUS_WR,
 	input       [3:0] CBUS_BA,
 	input             CBUS_REQ,
+	input             CBUS_ID,
 	input             CBUS_TAS,
 	output            CBUS_BUSY,
 	
@@ -22,6 +23,7 @@ module SH7604_CACHE (
 	output      [3:0] IBUS_BA,
 	output            IBUS_WE,
 	output            IBUS_REQ,
+	output            IBUS_PREREQ,
 	output            IBUS_BURST,
 	output            IBUS_LOCK,
 	input             IBUS_WAIT
@@ -43,12 +45,14 @@ module SH7604_CACHE (
 	bit         IBBURST;
 	bit         IBLOCK;
 	
+	wire CCR_SEL = (CBUS_A == 32'hFFFFFE92);
+	
 	wire CACHE_AREA      = (CBUS_A[31:29] == 3'b000);
 	wire NOCACHE_AREA    = (CBUS_A[31:29] == 3'b001);
 	wire PURGE_AREA      = (CBUS_A[31:29] == 3'b010);
 	wire CACHE_ADDR_AREA = (CBUS_A[31:29] == 3'b011);
-	wire CACHE_DATA_AREA = (CBUS_A[31:29] == 3'b110);
-	wire IO_AREA         = (CBUS_A[31:29] == 3'b111);
+	wire CACHE_DATA_AREA = (CBUS_A[31:29] == 3'b110 || CBUS_A[31:29] == 3'b100);
+	wire IO_AREA         = (CBUS_A[31:29] == 3'b111) && !CCR_SEL;
 	
 	
 	bit   [3:0] WAY_HIT;
@@ -78,7 +82,7 @@ module SH7604_CACHE (
 				6'b0??11?: res = 4'b0010;
 				6'b?0?0?1: res = 4'b0100;
 				6'b??0?00: res = 4'b1000;
-				default:   res = 4'b0001;
+				default:   res = 4'b0000;
 			endcase
 		end
 		return res;
@@ -91,7 +95,7 @@ module SH7604_CACHE (
 		      way[2] ? {lru[5],1'b1  ,lru[3],1'b1  ,lru[1],1'b0  } :
 		      way[1] ? {1'b1  ,lru[4],lru[3],1'b0  ,1'b0  ,lru[0]} :
 				way[0] ? {1'b0  ,1'b0  ,1'b0  ,lru[2],lru[1],lru[0]} :
-				         {1'b0  ,1'b0  ,1'b0  ,lru[2],lru[1],lru[0]};
+				         {lru[5],lru[4],lru[3],lru[2],lru[1],lru[0]};
 		return res;
 	endfunction
 	
@@ -118,199 +122,7 @@ module SH7604_CACHE (
 		return res;
 	endfunction
 	
-	
-`ifdef SIM
-	`define VBIT 0
-	`define TAG 19:1
-	
-	reg [25:0] WAY0 [64];
-	reg [25:0] WAY1 [64];
-	reg [25:0] WAY2 [64];
-	reg [25:0] WAY3 [64];
-	
-	reg [7:0] DATA00 [256]; reg [7:0] DATA01 [256]; reg [7:0] DATA02 [256]; reg [7:0] DATA03 [256];
-	reg [7:0] DATA10 [256]; reg [7:0] DATA11 [256]; reg [7:0] DATA12 [256]; reg [7:0] DATA13 [256];
-	reg [7:0] DATA20 [256]; reg [7:0] DATA21 [256]; reg [7:0] DATA22 [256]; reg [7:0] DATA23 [256];
-	reg [7:0] DATA30 [256]; reg [7:0] DATA31 [256]; reg [7:0] DATA32 [256]; reg [7:0] DATA33 [256];
-	
-	reg [5:0]  LRU [64];
-	
-	always_comb begin		
-		WAY_TAG[0] = WAY0[CBUS_A[9:4]][`TAG] == CBUS_A[28:10];
-		WAY_TAG[1] = WAY1[CBUS_A[9:4]][`TAG] == CBUS_A[28:10];
-		WAY_TAG[2] = WAY2[CBUS_A[9:4]][`TAG] == CBUS_A[28:10];
-		WAY_TAG[3] = WAY3[CBUS_A[9:4]][`TAG] == CBUS_A[28:10];
-		
-		WAY_HIT[0] = WAY_TAG[0] & WAY0[CBUS_A[9:4]][`VBIT];
-		WAY_HIT[1] = WAY_TAG[1] & WAY1[CBUS_A[9:4]][`VBIT];
-		WAY_HIT[2] = WAY_TAG[2] & WAY2[CBUS_A[9:4]][`VBIT];
-		WAY_HIT[3] = WAY_TAG[3] & WAY3[CBUS_A[9:4]][`VBIT];
-		
-		CACHE_DATA = '0;
-		if (CACHE_DATA_AREA) 
-			case (CBUS_A[11:10])
-				2'b00: CACHE_DATA = {DATA03[CBUS_A[9:2]],DATA02[CBUS_A[9:2]],DATA01[CBUS_A[9:2]],DATA00[CBUS_A[9:2]]};
-				2'b01: CACHE_DATA = {DATA13[CBUS_A[9:2]],DATA12[CBUS_A[9:2]],DATA11[CBUS_A[9:2]],DATA10[CBUS_A[9:2]]};
-				2'b10: CACHE_DATA = {DATA23[CBUS_A[9:2]],DATA22[CBUS_A[9:2]],DATA21[CBUS_A[9:2]],DATA20[CBUS_A[9:2]]};
-				2'b11: CACHE_DATA = {DATA33[CBUS_A[9:2]],DATA32[CBUS_A[9:2]],DATA31[CBUS_A[9:2]],DATA30[CBUS_A[9:2]]};
-			endcase
-		else if (CACHE_ADDR_AREA) 
-			case (CCR.W)
-				2'b00: CACHE_DATA = {3'b000,WAY0[CBUS_A[9:4]][`TAG],LRU[CBUS_A[9:4]],1'b0,WAY0[CBUS_A[9:4]][`VBIT],2'b00};
-				2'b01: CACHE_DATA = {3'b000,WAY1[CBUS_A[9:4]][`TAG],LRU[CBUS_A[9:4]],1'b0,WAY1[CBUS_A[9:4]][`VBIT],2'b00};
-				2'b10: CACHE_DATA = {3'b000,WAY2[CBUS_A[9:4]][`TAG],LRU[CBUS_A[9:4]],1'b0,WAY2[CBUS_A[9:4]][`VBIT],2'b00};
-				2'b11: CACHE_DATA = {3'b000,WAY3[CBUS_A[9:4]][`TAG],LRU[CBUS_A[9:4]],1'b0,WAY3[CBUS_A[9:4]][`VBIT],2'b00};
-			endcase
-		else
-			case (1'b1)
-				WAY_HIT[0]: CACHE_DATA = {DATA03[CBUS_A[9:2]],DATA02[CBUS_A[9:2]],DATA01[CBUS_A[9:2]],DATA00[CBUS_A[9:2]]};
-				WAY_HIT[1]: CACHE_DATA = {DATA13[CBUS_A[9:2]],DATA12[CBUS_A[9:2]],DATA11[CBUS_A[9:2]],DATA10[CBUS_A[9:2]]};
-				WAY_HIT[2]: CACHE_DATA = {DATA23[CBUS_A[9:2]],DATA22[CBUS_A[9:2]],DATA21[CBUS_A[9:2]],DATA20[CBUS_A[9:2]]};
-				WAY_HIT[3]: CACHE_DATA = {DATA33[CBUS_A[9:2]],DATA32[CBUS_A[9:2]],DATA31[CBUS_A[9:2]],DATA30[CBUS_A[9:2]]};
-			endcase
-		
-		LRU_DATA = LRU[CBUS_A[9:4]];
-	end
-	
-	always @(posedge CLK or negedge RST_N) begin
-		if (!RST_N) begin
-			WAY0 <= '{64{'0}};   WAY1 <= '{64{'0}};   WAY2 <= '{64{'0}};	WAY3 <= '{64{'0}};
-			DATA00 <= '{256{'0}};	DATA01 <= '{256{'0}};	DATA02 <= '{256{'0}};	DATA03 <= '{256{'0}};
-			DATA10 <= '{256{'0}};	DATA11 <= '{256{'0}};	DATA12 <= '{256{'0}};	DATA13 <= '{256{'0}};
-			DATA20 <= '{256{'0}};	DATA21 <= '{256{'0}};	DATA22 <= '{256{'0}};	DATA23 <= '{256{'0}};
-			DATA30 <= '{256{'0}};	DATA31 <= '{256{'0}};	DATA32 <= '{256{'0}};	DATA33 <= '{256{'0}};
-			LRU <= '{64{'0}};
-		end
-		else if (CE_R) begin
-			if (CACHE_UPDATE) begin
-				case (1'b1)
-					CACHE_WR_WAY[0]: begin 
-						{DATA03[CACHE_WR_ADDR[9:2]],DATA02[CACHE_WR_ADDR[9:2]],DATA01[CACHE_WR_ADDR[9:2]],DATA00[CACHE_WR_ADDR[9:2]]} <= IBUS_DI; 
-						WAY0[CACHE_WR_ADDR[9:4]][`TAG] <= CACHE_WR_ADDR[28:10]; 
-						WAY0[CACHE_WR_ADDR[9:4]][`VBIT] <= 1; 
-					end
-					CACHE_WR_WAY[1]: begin 
-						{DATA13[CACHE_WR_ADDR[9:2]],DATA12[CACHE_WR_ADDR[9:2]],DATA11[CACHE_WR_ADDR[9:2]],DATA10[CACHE_WR_ADDR[9:2]]} <= IBUS_DI; 
-						WAY1[CACHE_WR_ADDR[9:4]][`TAG] <= CACHE_WR_ADDR[28:10]; 
-						WAY1[CACHE_WR_ADDR[9:4]][`VBIT] <= 1; 
-					end
-					CACHE_WR_WAY[2]: begin 
-						{DATA23[CACHE_WR_ADDR[9:2]],DATA22[CACHE_WR_ADDR[9:2]],DATA21[CACHE_WR_ADDR[9:2]],DATA20[CACHE_WR_ADDR[9:2]]} <= IBUS_DI; 
-						WAY2[CACHE_WR_ADDR[9:4]][`TAG] <= CACHE_WR_ADDR[28:10]; 
-						WAY2[CACHE_WR_ADDR[9:4]][`VBIT] <= 1; 
-					end
-					CACHE_WR_WAY[3]: begin 
-						{DATA33[CACHE_WR_ADDR[9:2]],DATA32[CACHE_WR_ADDR[9:2]],DATA31[CACHE_WR_ADDR[9:2]],DATA30[CACHE_WR_ADDR[9:2]]} <= IBUS_DI; 
-						WAY3[CACHE_WR_ADDR[9:4]][`TAG] <= CACHE_WR_ADDR[28:10]; 
-						WAY3[CACHE_WR_ADDR[9:4]][`VBIT] <= 1; 
-					end
-				endcase
-			end
-			else if (CACHE_WRITE) begin
-				if (CACHE_WR_BA[0]) begin
-					case (1'b1)
-						CACHE_WR_WAY[0]: DATA00[CACHE_WR_ADDR[9:2]] <= CBUS_DI[7:0];
-						CACHE_WR_WAY[1]: DATA10[CACHE_WR_ADDR[9:2]] <= CBUS_DI[7:0];
-						CACHE_WR_WAY[2]: DATA20[CACHE_WR_ADDR[9:2]] <= CBUS_DI[7:0];
-						CACHE_WR_WAY[3]: DATA30[CACHE_WR_ADDR[9:2]] <= CBUS_DI[7:0];
-					endcase
-				end
-				if (CACHE_WR_BA[1]) begin
-					case (1'b1)
-						CACHE_WR_WAY[0]: DATA01[CACHE_WR_ADDR[9:2]] <= CBUS_DI[15:8];
-						CACHE_WR_WAY[1]: DATA11[CACHE_WR_ADDR[9:2]] <= CBUS_DI[15:8];
-						CACHE_WR_WAY[2]: DATA21[CACHE_WR_ADDR[9:2]] <= CBUS_DI[15:8];
-						CACHE_WR_WAY[3]: DATA31[CACHE_WR_ADDR[9:2]] <= CBUS_DI[15:8];
-					endcase
-				end
-				if (CACHE_WR_BA[2]) begin
-					case (1'b1)
-						CACHE_WR_WAY[0]: DATA02[CACHE_WR_ADDR[9:2]] <= CBUS_DI[23:16];
-						CACHE_WR_WAY[1]: DATA12[CACHE_WR_ADDR[9:2]] <= CBUS_DI[23:16];
-						CACHE_WR_WAY[2]: DATA22[CACHE_WR_ADDR[9:2]] <= CBUS_DI[23:16];
-						CACHE_WR_WAY[3]: DATA32[CACHE_WR_ADDR[9:2]] <= CBUS_DI[23:16];
-					endcase
-				end
-				if (CACHE_WR_BA[3]) begin
-					case (1'b1)
-						CACHE_WR_WAY[0]: DATA03[CACHE_WR_ADDR[9:2]] <= CBUS_DI[31:24];
-						CACHE_WR_WAY[1]: DATA13[CACHE_WR_ADDR[9:2]] <= CBUS_DI[31:24];
-						CACHE_WR_WAY[2]: DATA23[CACHE_WR_ADDR[9:2]] <= CBUS_DI[31:24];
-						CACHE_WR_WAY[3]: DATA33[CACHE_WR_ADDR[9:2]] <= CBUS_DI[31:24];
-					endcase
-				end
-			end
-			else if (CACHE_LINE_PURGE) begin
-				case (1'b1)
-					CACHE_WR_WAY[0]: WAY0[CACHE_WR_ADDR[9:4]][`VBIT] <= 0;
-					CACHE_WR_WAY[1]: WAY1[CACHE_WR_ADDR[9:4]][`VBIT] <= 0;
-					CACHE_WR_WAY[2]: WAY2[CACHE_WR_ADDR[9:4]][`VBIT] <= 0;
-					CACHE_WR_WAY[3]: WAY3[CACHE_WR_ADDR[9:4]][`VBIT] <= 0;
-				endcase
-			end
-			else if (CACHE_DATA_WRITE) begin
-				if (CACHE_WR_BA[0]) begin
-					case (CACHE_WR_ADDR[11:10])
-						2'b00: DATA00[CACHE_WR_ADDR[9:2]] <= CBUS_DI[7:0];
-						2'b01: DATA10[CACHE_WR_ADDR[9:2]] <= CBUS_DI[7:0];
-						2'b10: DATA20[CACHE_WR_ADDR[9:2]] <= CBUS_DI[7:0];
-						2'b11: DATA30[CACHE_WR_ADDR[9:2]] <= CBUS_DI[7:0];
-					endcase
-				end
-				if (CACHE_WR_BA[1]) begin
-					case (CACHE_WR_ADDR[11:10])
-						2'b00: DATA01[CACHE_WR_ADDR[9:2]] <= CBUS_DI[15:8];
-						2'b01: DATA11[CACHE_WR_ADDR[9:2]] <= CBUS_DI[15:8];
-						2'b10: DATA21[CACHE_WR_ADDR[9:2]] <= CBUS_DI[15:8];
-						2'b11: DATA31[CACHE_WR_ADDR[9:2]] <= CBUS_DI[15:8];
-					endcase
-				end
-				if (CACHE_WR_BA[2]) begin
-					case (CACHE_WR_ADDR[11:10])
-						2'b00: DATA02[CACHE_WR_ADDR[9:2]] <= CBUS_DI[23:16];
-						2'b01: DATA12[CACHE_WR_ADDR[9:2]] <= CBUS_DI[23:16];
-						2'b10: DATA22[CACHE_WR_ADDR[9:2]] <= CBUS_DI[23:16];
-						2'b11: DATA32[CACHE_WR_ADDR[9:2]] <= CBUS_DI[23:16];
-					endcase
-				end
-				if (CACHE_WR_BA[3]) begin
-					case (CACHE_WR_ADDR[11:10])
-						2'b00: DATA03[CACHE_WR_ADDR[9:2]] <= CBUS_DI[31:24];
-						2'b01: DATA13[CACHE_WR_ADDR[9:2]] <= CBUS_DI[31:24];
-						2'b10: DATA23[CACHE_WR_ADDR[9:2]] <= CBUS_DI[31:24];
-						2'b11: DATA33[CACHE_WR_ADDR[9:2]] <= CBUS_DI[31:24];
-					endcase
-				end
-			end
-			else if (CACHE_ADDR_WRITE) begin
-				case (CCR.W)
-					2'b00: begin WAY0[CACHE_WR_ADDR[9:4]][`TAG] <= CACHE_WR_ADDR[28:10]; WAY0[CACHE_WR_ADDR[9:4]][`VBIT] <= CACHE_WR_ADDR[2]; end
-					2'b01: begin WAY1[CACHE_WR_ADDR[9:4]][`TAG] <= CACHE_WR_ADDR[28:10]; WAY1[CACHE_WR_ADDR[9:4]][`VBIT] <= CACHE_WR_ADDR[2]; end
-					2'b10: begin WAY2[CACHE_WR_ADDR[9:4]][`TAG] <= CACHE_WR_ADDR[28:10]; WAY2[CACHE_WR_ADDR[9:4]][`VBIT] <= CACHE_WR_ADDR[2]; end
-					2'b11: begin WAY3[CACHE_WR_ADDR[9:4]][`TAG] <= CACHE_WR_ADDR[28:10]; WAY3[CACHE_WR_ADDR[9:4]][`VBIT] <= CACHE_WR_ADDR[2]; end
-				endcase
-			end
-			else if (CCR.CP) begin
-				WAY0 <= '{64{'0}};   
-				WAY1 <= '{64{'0}};   
-				WAY2 <= '{64{'0}};	
-				WAY3 <= '{64{'0}};
-				LRU <= '{64{'0}};
-			end
-			
-			if (CACHE_UPDATE || CACHE_WRITE || CACHE_READ) begin
-				LRU[CACHE_WR_ADDR[9:4]] <= LRUSelect(CACHE_WR_WAY, LRU[CACHE_WR_ADDR[9:4]]); 
-			end
-			else if (CACHE_ADDR_WRITE) begin
-				LRU[CACHE_WR_ADDR[9:4]] <= CBUS_DI[9:4];
-			end
-		end
-	end
-	
-`else
-	`define VBIT 0
-	`define TAG  19:1
-	
+
 	wire  [1:0] CRAM_WRWAY = CACHE_DATA_WRITE ? CACHE_WR_ADDR[11:10] : WayToAddr(CACHE_WR_WAY);
 	wire  [9:0] CRAM_WRADDR = {CRAM_WRWAY,CACHE_WR_ADDR[9:2]};
 	wire [31:0] CRAM_D = CACHE_UPDATE ? IBUS_DI : CBUS_DI;
@@ -326,17 +138,21 @@ module SH7604_CACHE (
 	CACHE_RAM ram3(.wrclock(CLK), .wraddress(CRAM_WRADDR), .data(CRAM_D[31:24]), .wren(CRAM_WE[3] & EN & CE_R), .rdclock(CLK), .rdaddress(CRAM_RDADDR), .q(CRAM_Q[31:24]));
 	
 	
-	wire [19:0] CTAG_D = CACHE_UPDATE ? {CACHE_WR_ADDR[28:10],1'b1} : CACHE_ADDR_WRITE ? {CACHE_WR_ADDR[28:10],CACHE_WR_ADDR[2]} : '0;
-	wire  [3:0] CTAG_WE = ({4{CACHE_UPDATE | CACHE_LINE_PURGE}} & CACHE_WR_WAY) | ({4{CACHE_ADDR_WRITE}} & AddrToWay(CCR.W));
+	wire [18:0] CTAG_D = CACHE_UPDATE ? CACHE_WR_ADDR[28:10] : CACHE_ADDR_WRITE ? CACHE_WR_ADDR[28:10] : '0;
+	wire  [3:0] CTAG_WE = ({4{CACHE_UPDATE}} & CACHE_WR_WAY) | ({4{CACHE_ADDR_WRITE}} & AddrToWay(CCR.W));
+	bit  [18:0] CTAG_Q[4];
+	CACHE_TAG tag0(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[0] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG_Q[0]));
+	CACHE_TAG tag1(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[1] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG_Q[1]));
+	CACHE_TAG tag2(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[2] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG_Q[2]));
+	CACHE_TAG tag3(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[3] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG_Q[3]));
 	
-	bit  [19:0] CTAG0_Q;
-	bit  [19:0] CTAG1_Q;
-	bit  [19:0] CTAG2_Q;
-	bit  [19:0] CTAG3_Q;
-	CACHE_TAG tag0(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[0] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG0_Q));
-	CACHE_TAG tag1(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[1] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG1_Q));
-	CACHE_TAG tag2(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[2] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG2_Q));
-	CACHE_TAG tag3(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CTAG_D), .wren(CTAG_WE[3] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CTAG3_Q));
+	wire        CVALID_D = CACHE_UPDATE ? 1'b1 : CACHE_ADDR_WRITE ? CACHE_WR_ADDR[2] : 1'b0;
+	wire  [3:0] CVALID_WE = ({4{CACHE_UPDATE | CACHE_LINE_PURGE}} & CACHE_WR_WAY) | ({4{CACHE_ADDR_WRITE}} & AddrToWay(CCR.W));
+	bit         CVALID_Q[4];
+	CACHE_VALID valid0(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CVALID_D), .wren(CVALID_WE[0] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CVALID_Q[0]));
+	CACHE_VALID valid1(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CVALID_D), .wren(CVALID_WE[1] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CVALID_Q[1]));
+	CACHE_VALID valid2(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CVALID_D), .wren(CVALID_WE[2] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CVALID_Q[2]));
+	CACHE_VALID valid3(.clock(CLK), .wraddress(CACHE_WR_ADDR[9:4]), .data(CVALID_D), .wren(CVALID_WE[3] & EN & CE_R), .rdaddress(CBUS_A[9:4]), .q(CVALID_Q[3]));
 	
 	reg [63:0] TAG_DIRTY[4];
 	always @(posedge CLK or negedge RST_N) begin
@@ -344,43 +160,14 @@ module SH7604_CACHE (
 			TAG_DIRTY <= '{'1,'1,'1,'1};
 		end
 		else if (EN && CE_R) begin
-			if (CTAG_WE[0]) TAG_DIRTY[0][CACHE_WR_ADDR[9:4]] <= CACHE_LINE_PURGE;
-			if (CTAG_WE[1]) TAG_DIRTY[1][CACHE_WR_ADDR[9:4]] <= CACHE_LINE_PURGE;
-			if (CTAG_WE[2]) TAG_DIRTY[2][CACHE_WR_ADDR[9:4]] <= CACHE_LINE_PURGE;
-			if (CTAG_WE[3]) TAG_DIRTY[3][CACHE_WR_ADDR[9:4]] <= CACHE_LINE_PURGE;
+			if (CVALID_WE[0]) TAG_DIRTY[0][CACHE_WR_ADDR[9:4]] <= CACHE_LINE_PURGE;
+			if (CVALID_WE[1]) TAG_DIRTY[1][CACHE_WR_ADDR[9:4]] <= CACHE_LINE_PURGE;
+			if (CVALID_WE[2]) TAG_DIRTY[2][CACHE_WR_ADDR[9:4]] <= CACHE_LINE_PURGE;
+			if (CVALID_WE[3]) TAG_DIRTY[3][CACHE_WR_ADDR[9:4]] <= CACHE_LINE_PURGE;
 		end
 		else if (CCR.CP) begin
 			TAG_DIRTY <= '{'1,'1,'1,'1};
 		end
-	end
-	
-	always_comb begin	
-		bit [3:0] DIRTY;
-		
-		DIRTY[0] = TAG_DIRTY[0][CBUS_A[9:4]];
-		DIRTY[1] = TAG_DIRTY[1][CBUS_A[9:4]];
-		DIRTY[2] = TAG_DIRTY[2][CBUS_A[9:4]];
-		DIRTY[3] = TAG_DIRTY[3][CBUS_A[9:4]];
-	
-		WAY_TAG[0] = CTAG0_Q[`TAG] == CBUS_A[28:10];
-		WAY_TAG[1] = CTAG1_Q[`TAG] == CBUS_A[28:10];
-		WAY_TAG[2] = CTAG2_Q[`TAG] == CBUS_A[28:10];
-		WAY_TAG[3] = CTAG3_Q[`TAG] == CBUS_A[28:10];
-		
-		WAY_HIT[0] = WAY_TAG[0] & CTAG0_Q[`VBIT] & ~DIRTY[0];
-		WAY_HIT[1] = WAY_TAG[1] & CTAG1_Q[`VBIT] & ~DIRTY[1];
-		WAY_HIT[2] = WAY_TAG[2] & CTAG2_Q[`VBIT] & ~DIRTY[2];
-		WAY_HIT[3] = WAY_TAG[3] & CTAG3_Q[`VBIT] & ~DIRTY[3];
-		
-		if (CACHE_ADDR_AREA) 
-			case (CCR.W)
-				2'b00: CACHE_DATA = {3'b000,CTAG0_Q[`TAG],LRU_B_Q,1'b0,CTAG0_Q[`VBIT],2'b00};
-				2'b01: CACHE_DATA = {3'b000,CTAG1_Q[`TAG],LRU_B_Q,1'b0,CTAG1_Q[`VBIT],2'b00};
-				2'b10: CACHE_DATA = {3'b000,CTAG2_Q[`TAG],LRU_B_Q,1'b0,CTAG2_Q[`VBIT],2'b00};
-				2'b11: CACHE_DATA = {3'b000,CTAG3_Q[`TAG],LRU_B_Q,1'b0,CTAG3_Q[`VBIT],2'b00};
-			endcase
-		else
-			CACHE_DATA = CRAM_Q;
 	end
 	
 	reg [63:0] LRU_DIRTY;
@@ -414,8 +201,40 @@ module SH7604_CACHE (
 		LRU_DATA = LRU_B_Q & {6{~DIRTY}};
 	end
 	
+	always_comb begin	
+		bit [ 3: 0] DIRTY;
+		bit [31: 0] CACHE_ADDR_AREA_DATA;
+		
+		DIRTY[0] = TAG_DIRTY[0][CBUS_A[9:4]];
+		DIRTY[1] = TAG_DIRTY[1][CBUS_A[9:4]];
+		DIRTY[2] = TAG_DIRTY[2][CBUS_A[9:4]];
+		DIRTY[3] = TAG_DIRTY[3][CBUS_A[9:4]];
 	
-`endif
+		WAY_TAG[0] = CTAG_Q[0] == CBUS_A[28:10];
+		WAY_TAG[1] = CTAG_Q[1] == CBUS_A[28:10];
+		WAY_TAG[2] = CTAG_Q[2] == CBUS_A[28:10];
+		WAY_TAG[3] = CTAG_Q[3] == CBUS_A[28:10];
+		
+		WAY_HIT[0] = WAY_TAG[0] & CVALID_Q[0] & ~DIRTY[0];
+		WAY_HIT[1] = WAY_TAG[1] & CVALID_Q[1] & ~DIRTY[1];
+		WAY_HIT[2] = WAY_TAG[2] & CVALID_Q[2] & ~DIRTY[2];
+		WAY_HIT[3] = WAY_TAG[3] & CVALID_Q[3] & ~DIRTY[3];
+		
+		if (CACHE_ADDR_AREA) begin
+			case (CCR.W)
+				2'b00: CACHE_ADDR_AREA_DATA = {3'b000, CTAG_Q[0], LRU_DATA, 1'b0, CVALID_Q[0] & ~DIRTY[0], 2'b00};
+				2'b01: CACHE_ADDR_AREA_DATA = {3'b000, CTAG_Q[1], LRU_DATA, 1'b0, CVALID_Q[1] & ~DIRTY[1], 2'b00};
+				2'b10: CACHE_ADDR_AREA_DATA = {3'b000, CTAG_Q[2], LRU_DATA, 1'b0, CVALID_Q[2] & ~DIRTY[2], 2'b00};
+				2'b11: CACHE_ADDR_AREA_DATA = {3'b000, CTAG_Q[3], LRU_DATA, 1'b0, CVALID_Q[3] & ~DIRTY[3], 2'b00};
+			endcase
+			case (CBUS_BA)
+				4'b1111: CACHE_DATA = CACHE_ADDR_AREA_DATA;
+				default: CACHE_DATA = {2{CACHE_ADDR_AREA_DATA[15:0]}};
+			endcase
+		end
+		else
+			CACHE_DATA = CRAM_Q;
+	end
 	
 	
 	wire HIT = WAY_HIT[0] | WAY_HIT[1] | WAY_HIT[2] | WAY_HIT[3];
@@ -427,7 +246,7 @@ module SH7604_CACHE (
 	bit         IBUS_READ_PEND;
 	bit         IBUS_READARRAY;
 	always @(posedge CLK or negedge RST_N) begin
-		bit [ 1:0] ARRAY_POS;
+		bit [ 1: 0] ARRAY_POS;
 		
 		if (!RST_N) begin
 			IBADDR <= '0;
@@ -467,6 +286,34 @@ module SH7604_CACHE (
 			CACHE_LINE_PURGE <= 0;
 			CACHE_DATA_WRITE <= 0;
 			CACHE_ADDR_WRITE <= 0;
+			
+			IBDATA_RDY <= 0;
+			if (!IBUS_WAIT) begin
+				if (IBUS_WRITE) begin
+					IBREQ <= 0;
+					IBUS_WRITE <= 0;
+				end
+				else if (IBUS_READ) begin
+					IBREQ <= 0;
+					IBDATA_RDY <= 1;
+					IBUS_READ <= 0;
+				end
+				else if (IBUS_READARRAY) begin
+					IBADDR <= {IBADDR[31:4],IBADDR[3:2] + 2'd1,2'b00};
+					if (IBADDR[3:2] == ARRAY_POS) begin
+						IBREQ <= 0;
+						IBDATA_RDY <= 1;
+						IBUS_READARRAY <= 0;
+					end
+					if (IBADDR[3:2] == ARRAY_POS - 2'd1) begin
+						IBLOCK <= 0;
+					end
+					CACHE_WR_ADDR <= IBADDR[28:2];
+					CACHE_WR_BA <= 4'b1111;
+					CACHE_UPDATE <= CBUS_ID ? ~CCR.ID : ~CCR.OD;
+				end
+			end
+			
 			if (CBUS_REQ) begin
 				if (CBUS_WR) begin
 					if ((CACHE_AREA || NOCACHE_AREA || IO_AREA)) begin
@@ -485,7 +332,7 @@ module SH7604_CACHE (
 						end
 					end
 					
-					if (CACHE_AREA && HIT && CCR.CE && !IBREQ) begin
+					if (CACHE_AREA && HIT && CCR.CE && (!IBREQ)) begin
 						CACHE_WR_ADDR <= CBUS_A[28:2];
 						CACHE_WR_BA <= CBUS_BA;
 						CACHE_WR_WAY <= WAY_HIT;
@@ -493,7 +340,7 @@ module SH7604_CACHE (
 					end
 					else if (PURGE_AREA) begin
 						CACHE_WR_ADDR <= CBUS_A[28:2];
-						CACHE_WR_BA <= 4'b1111;
+//						CACHE_WR_BA <= 4'b1111;
 						CACHE_WR_WAY <= WAY_TAG;
 						CACHE_LINE_PURGE <= 1;
 					end
@@ -504,7 +351,7 @@ module SH7604_CACHE (
 					end
 					else if (CACHE_ADDR_AREA) begin
 						CACHE_WR_ADDR <= CBUS_A[28:2];
-						CACHE_WR_BA <= 4'b1111;
+//						CACHE_WR_BA <= 4'b1111;
 						CACHE_ADDR_WRITE <= 1;
 					end
 				end
@@ -536,7 +383,7 @@ module SH7604_CACHE (
 								IBWE <= 0;
 								IBREQ <= 1;
 								IBBURST <= 1;
-								IBLOCK <= 1;
+								IBLOCK <= 0;
 								ARRAY_POS <= CBUS_A[3:2];
 								CACHE_WR_WAY <= WayFromLRU(LRU_DATA, CCR.TW);
 								IBUS_READARRAY <= 1;
@@ -546,42 +393,19 @@ module SH7604_CACHE (
 							end
 						end
 					end
+					else if (PURGE_AREA) begin
+						CACHE_WR_ADDR <= CBUS_A[28:2];
+//						CACHE_WR_BA <= 4'b1111;
+						CACHE_WR_WAY <= WAY_TAG;
+						CACHE_LINE_PURGE <= 1;
+					end
 				end
 			end
 			
-			IBDATA_RDY <= 0;
-			if (!IBUS_WAIT) begin
-				if (IBUS_WRITE) begin
-					IBREQ <= 0;
-					IBUS_WRITE <= 0;
-				end
-				else if (IBUS_READ) begin
-					IBREQ <= 0;
-					IBDATA_RDY <= 1;
-					IBUS_READ <= 0;
-				end
-				else if (IBUS_READARRAY) begin
-					IBADDR <= {IBADDR[31:4],IBADDR[3:2] + 2'd1,2'b00};
-					if (IBADDR[3:2] == ARRAY_POS) begin
-						IBREQ <= 0;
-						IBDATA_RDY <= 1;
-						IBUS_READARRAY <= 0;
-					end
-					if (IBADDR[3:2] == ARRAY_POS - 2'd1) begin
-						IBLOCK <= 0;
-					end
-					CACHE_WR_ADDR <= IBADDR[28:2];
-					CACHE_WR_BA <= 4'b1111;
-					CACHE_UPDATE <= 1;
-				end
-			end
 		end
 	end
 	
-	assign CBUS_BUSY = CBUS_REQ & (IBUS_READ | IBUS_READARRAY | IBUS_READ_PEND | IBUS_WRITE_PEND);
 	
-	
-	wire CCR_SEL = IBADDR == 32'hFFFFFE92;
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			CCR <= '0;
@@ -593,38 +417,25 @@ module SH7604_CACHE (
 			CCR <= CCR_INIT;
 		end
 		else if (CE_R) begin
-			if (CCR_SEL && IBBA ==? 4'b001? && IBWE && IBREQ) begin
-				CCR <= IBDATA[7:0] & CCR_WMASK;
+			if (CCR_SEL && CBUS_WR && CBUS_REQ) begin
+				CCR <= CBUS_DI[7:0] & CCR_WMASK;
 			end
 			if (CCR.CP) CCR.CP <= 0;
 		end
 	end
 	
-	bit [31:0] REG_DO;
-	bit        REG_RDY;
-	always @(posedge CLK or negedge RST_N) begin
-		if (!RST_N) begin
-			REG_DO <= '0;
-		end
-		else if (CE_F) begin
-			REG_RDY <= 0;
-			if (CCR_SEL && !IBWE && IBREQ) begin
-				REG_DO <= {4{CCR & CCR_RMASK}};
-				REG_RDY <= 1;
-			end
-		end
-	end
-	
-	assign CBUS_DO = REG_RDY ? REG_DO : 
+	assign CBUS_DO = CCR_SEL ? {4{CCR & CCR_RMASK}} : 
 	                 IBDATA_RDY ? IBUS_DI : 
 						  CACHE_DATA;
+	assign CBUS_BUSY = CBUS_REQ && (IBUS_READ || IBUS_READARRAY || IBUS_READ_PEND || IBUS_WRITE_PEND);
 						  
 	assign IBUS_A = IBADDR;
 	assign IBUS_DO = IBDATA;
 	assign IBUS_BA = IBBA;
 	assign IBUS_WE = IBWE;
 	assign IBUS_REQ = IBREQ;
-	assign IBUS_BURST = IBBURST;
+	assign IBUS_PREREQ = CBUS_REQ && ((!CBUS_WR && ((CACHE_AREA && (!CCR.CE /*|| CBUS_TAS*/)) || (NOCACHE_AREA && !CBUS_TAS))) || (!CBUS_WR && CACHE_AREA && CCR.CE && !HIT)) && !IBREQ;
+	assign IBUS_BURST = IBBURST; 
 	assign IBUS_LOCK = IBLOCK;
 
 endmodule

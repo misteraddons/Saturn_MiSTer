@@ -1,145 +1,172 @@
-module Saturn (
-	input             CLK,
-	input             RST_N,
-	input             EN,
+module Saturn
+#(parameter bit RAMH_SLOW=0)
+(
+	input              CLK,
+	input              RST_N,
+	input              EN,
 	
-	input             SYS_CE_F,
-	input             SYS_CE_R,
+	input              SYS_CE_F,
+	input              SYS_CE_R,
 	
-	input             SRES_N,
+	input              SRES_N,
 	
-	input             PAL,
+	input              PAL,
 	
-	output     [24:0] MEM_A,
-	input      [31:0] MEM_DI,
-	output     [31:0] MEM_DO,
-	output            ROM_CS_N,
-	output            SRAM_CS_N,
-	output            RAML_CS_N,
-	output            RAMH_CS_N,
-	output      [3:0] MEM_DQM_N,
-	output            MEM_RD_N,
-	input             MEM_WAIT_N,
+	output     [24: 0] MEM_A,
+	input      [31: 0] MEM_DI,
+	output     [31: 0] MEM_DO,
+	output             ROM_CS_N,
+	output             SRAM_CS_N,
+	output             RAML_CS_N,
+	output             RAMH_CS_N,
+	output             RAMH_BURST,
+	output             RAMH_RFS,
+`ifdef STV_BUILD
+	output             STVIO_CS_N,
+`endif
+	output     [ 3: 0] MEM_DQM_N,
+	output             MEM_RD_N,
+	input              MEM_WAIT_N,
 	
-	output     [18:1] VDP1_VRAM_A,
-	output     [15:0] VDP1_VRAM_D,
-	input      [15:0] VDP1_VRAM_Q,
-	output      [1:0] VDP1_VRAM_WE,
-	output            VDP1_VRAM_RD,
-	input             VDP1_VRAM_RDY,
+	output     [18: 1] VDP1_VRAM_A,
+	output     [15: 0] VDP1_VRAM_D,
+	input      [15: 0] VDP1_VRAM_Q,
+	output     [ 1: 0] VDP1_VRAM_WE,
+	output             VDP1_VRAM_RD,
+	output     [ 8: 0] VDP1_VRAM_BLEN,
+	input              VDP1_VRAM_RDY,
 	
-	output     [17:1] VDP1_FB0_A,
-	output     [15:0] VDP1_FB0_D,
-	input      [15:0] VDP1_FB0_Q,
-	output      [1:0] VDP1_FB0_WE,
-	output            VDP1_FB0_RD,
+	output     [17: 1] VDP1_FB0_A,
+	output     [15: 0] VDP1_FB0_D,
+	input      [15: 0] VDP1_FB0_Q,
+	output     [ 1: 0] VDP1_FB0_WE,
+	output             VDP1_FB0_RD,
 	
-	output     [17:1] VDP1_FB1_A,
-	output     [15:0] VDP1_FB1_D,
-	input      [15:0] VDP1_FB1_Q,
-	output      [1:0] VDP1_FB1_WE,
-	output            VDP1_FB1_RD,
+	output     [17: 1] VDP1_FB1_A,
+	output     [15: 0] VDP1_FB1_D,
+	input      [15: 0] VDP1_FB1_Q,
+	output     [ 1: 0] VDP1_FB1_WE,
+	output             VDP1_FB1_RD,
 	
-	input             VDP1_FB_RDY,
-	output            VDP1_FB_MODE3,
+	input              VDP1_FB_RDY,
+	output             VDP1_FB_MODE3,
 	
-	output     [18:1] VDP2_RA0_A,
-	output     [16:1] VDP2_RA1_A,
-	output     [63:0] VDP2_RA_D,
-	output      [7:0] VDP2_RA_WE,
-	output            VDP2_RA_RD,
-	input      [31:0] VDP2_RA0_Q,
-	input      [31:0] VDP2_RA1_Q,
+	output     [18: 1] VDP2_RA0_A,
+	output     [16: 1] VDP2_RA1_A,
+	output     [63: 0] VDP2_RA_D,
+	output     [ 7: 0] VDP2_RA_WE,
+	output             VDP2_RA_RD,
+	input      [31: 0] VDP2_RA0_Q,
+	input      [31: 0] VDP2_RA1_Q,
 	
-	output     [18:1] VDP2_RB0_A,
-	output     [16:1] VDP2_RB1_A,
-	output     [63:0] VDP2_RB_D,
-	output      [7:0] VDP2_RB_WE,
-	output            VDP2_RB_RD,
-	input      [31:0] VDP2_RB0_Q,
-	input      [31:0] VDP2_RB1_Q,
+	output     [18: 1] VDP2_RB0_A,
+	output     [16: 1] VDP2_RB1_A,
+	output     [63: 0] VDP2_RB_D,
+	output     [ 7: 0] VDP2_RB_WE,
+	output             VDP2_RB_RD,
+	input      [31: 0] VDP2_RB0_Q,
+	input      [31: 0] VDP2_RB1_Q,
 
-	input             SCSP_CE,
-	output     [18:1] SCSP_RAM_A,
-	output     [15:0] SCSP_RAM_D,
-	output      [1:0] SCSP_RAM_WE,
-	output            SCSP_RAM_RD,
-	output            SCSP_RAM_CS,
-	input      [15:0] SCSP_RAM_Q,
-	output            SCSP_RAM_RFS,
-	input             SCSP_RAM_RDY,
+	input              SCSP_CE,
+	output     [18: 1] SCSP_RAM_A,
+	output     [15: 0] SCSP_RAM_D,
+	output     [ 1: 0] SCSP_RAM_WE,
+	output             SCSP_RAM_RD,
+	output             SCSP_RAM_CS,
+	input      [15: 0] SCSP_RAM_Q,
+	output             SCSP_RAM_RFS,
+	input              SCSP_RAM_RDY,
 	
-	input             SMPC_CE,
-	input             TIME_SET,
-	input       [3:0] SMPC_AREA,
-	output            SMPC_DOTSEL,
+	input              SMPC_CE,
+	input              TIME_SET,
+	input      [64: 0] RTC,
+	input      [ 3: 0] SMPC_AREA,
+	output             SMPC_DOTSEL,
 	
-	input     [ 6: 0] SMPC_PDR1I,
-	output    [ 6: 0] SMPC_PDR1O,
-	output    [ 6: 0] SMPC_DDR1,
-	input     [ 6: 0] SMPC_PDR2I,
-	output    [ 6: 0] SMPC_PDR2O,
-	output    [ 6: 0] SMPC_DDR2,
-	output            SMPC_INPUT_ACT,
-	output     [ 4:0] SMPC_INPUT_POS,
-	input      [ 7:0] SMPC_INPUT_DATA,
-	input             SMPC_INPUT_WE,
-
-	input             CD_CE,
-	input             CD_CDATA,
-	output            CD_HDATA,
-	output            CD_COMCLK,
-	input             CD_COMREQ_N,
-	input             CD_COMSYNC_N,
-	output            CD_DEMP,
-	input      [15:0] CD_D,
-	input             CD_CK,
-	input             CD_AUDIO,
-	output     [18:1] CD_RAM_A,
-	output     [15:0] CD_RAM_D,
-	output      [1:0] CD_RAM_WE,
-	output            CD_RAM_RD,
-	output            CD_RAM_CS,
-	input      [15:0] CD_RAM_Q,
-	input             CD_RAM_RDY,
+	input      [ 6: 0] SMPC_PDR1I,
+	output     [ 6: 0] SMPC_PDR1O,
+	output     [ 6: 0] SMPC_DDR1,
+	input      [ 6: 0] SMPC_PDR2I,
+	output     [ 6: 0] SMPC_PDR2O,
+	output     [ 6: 0] SMPC_DDR2,
 	
-	input       [2:0] CART_MODE,
-	output     [21:1] CART_MEM_A,
-	output     [15:0] CART_MEM_D,
-	output     [ 1:0] CART_MEM_WE,
-	output            CART_MEM_RD,
-	input      [15:0] CART_MEM_Q,
-	input             CART_MEM_RDY,
+`ifndef STV_BUILD
+	input              CD_CE,
+	input              CD_CDATA,
+	output             CD_HDATA,
+	output             CD_COMCLK,
+	input              CD_COMREQ_N,
+	input              CD_COMSYNC_N,
+	output             CD_DEMP,
+	input      [15: 0] CD_D,
+	input              CD_CK,
+	input              CD_AUDIO,
+	output     [18: 1] CD_RAM_A,
+	output     [15: 0] CD_RAM_D,
+	output     [ 1: 0] CD_RAM_WE,
+	output             CD_RAM_RD,
+	output             CD_RAM_CS,
+	input      [15: 0] CD_RAM_Q,
+	input              CD_RAM_RDY,
+`endif
 	
-	output      [7:0] R,
-	output      [7:0] G,
-	output      [7:0] B,
-	output reg        DCLK,
-	output reg        HS_N,
-	output reg        VS_N,
-	output reg        HBL_N,
-	output reg        VBL_N,
+`ifndef STV_BUILD
+	input      [ 2: 0] CART_MODE,
+`else
+	input              STV_5838_MODE,
+	input      [ 3: 0] STV_5881_MODE,
+	input              STV_BATMAN_MODE,
+`endif
+	output      [25:1] CART_MEM_A,
+	output      [15:0] CART_MEM_D,
+	output      [ 1:0] CART_MEM_WE,
+	output             CART_MEM_RD,
+	input       [15:0] CART_MEM_Q,
+	input              CART_MEM_RDY,
 	
-	output            FIELD,
-	output            INTERLACE,
-	output      [1:0] HRES,
-	output      [1:0] VRES,
-	output            DCE_R,
-	output            DCE_F,
+`ifdef STV_BUILD
+	output     [24: 1] RAX_MEM_A,
+	input      [15: 0] RAX_MEM_DI,
+	output     [15: 0] RAX_MEM_DO,
+	output             RAX_MEM_RD,
+	output             RAX_MEM_WR,
+	input              RAX_MEM_RDY,
+	output     [15: 0] RAX_SOUND_L,
+	output     [15: 0] RAX_SOUND_R,
+`endif
 	
-	output     [15:0] SOUND_L,
-	output     [15:0] SOUND_R,
+`ifdef STV_BUILD
+	input      [ 7: 0] STV_SW,
+`endif
 	
-	input       [7:0] SCRN_EN,
-	input       [2:0] SND_EN,
-	input      [31:0] SLOT_EN,
-	input             DBG_PAUSE,
-	input             DBG_BREAK,
-	input             DBG_RUN,
-	input       [7:0] DBG_EXT,
+	output     [ 7: 0] R,
+	output     [ 7: 0] G,
+	output     [ 7: 0] B,
+	output reg         DCLK,
+	output reg         HS_N,
+	output reg         VS_N,
+	output reg         HBL_N,
+	output reg         VBL_N,
 	
-	output      [7:0] DBG_WAIT_CNT,
-	output reg        DBG_HOOK
+	output             FIELD,
+	output             INTERLACE,
+	output     [ 1: 0] HRES,
+	output     [ 1: 0] VRES,
+	output             DCE_R,
+	output             DCE_F,
+	
+	output     [15: 0] SOUND_L,
+	output     [15: 0] SOUND_R,
+	
+	input              FAST,
+	input              BLUR_MESH,
+	
+	input      [ 7: 0] SCRN_EN,
+	input      [ 2: 0] SND_EN,
+	input              DBG_PAUSE,
+	input              DBG_BREAK,
+	input              DBG_RUN,
+	input      [ 7: 0] DBG_EXT
 );
 
 	bit BREAK;
@@ -188,6 +215,7 @@ module Saturn (
 	bit         MSHNMI_N;
 	bit         MSHBGR_N;
 	bit         MSHBRLS_N;
+	bit         MSRFS;
 	
 	//SSH
 	bit  [26:0] SSHA;
@@ -234,6 +262,8 @@ module Saturn (
 	bit         ECRD_WR_N;
 	bit         ECCS3_N;
 	bit         ECRD_N;
+	bit         ECBURST;
+	bit         ECRFS;
 	bit         ECWAIT_N;
 
 	bit  [25:0] AA;
@@ -265,7 +295,6 @@ module Saturn (
 	bit         BRDY2_N;
 	bit         IRQV_N;
 	bit         IRQH_N;
-	bit         IRQL_N;
 	bit         BCSS_N;
 	bit         BRDYS_N;
 	bit         IRQS_N;
@@ -289,6 +318,7 @@ module Saturn (
 	bit         SYSRES_N;
 	bit         SNDRES_N;
 	bit         CDRES_N;
+	bit         EXL_N;
 	
 	//VDP1
 	bit  [15:0] VDP1_DO;
@@ -309,7 +339,7 @@ module Saturn (
 	bit  [15:0] CD_SL;
 	bit  [15:0] CD_SR;
 	
-	SH7604 MSH
+	SH7604 #(.UBC_DISABLE(1), .SCI_DISABLE(1), .BUS_AREA_TIMIMG({RAMH_SLOW,3'b111}), .BUS_SIZE_BYTE_DISABLE(1)) MSH
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
@@ -334,6 +364,7 @@ module Saturn (
 		.WE_N(MSHDQM_N),
 		.RD_N(MSHRD_N),
 		.IVECF_N(MSHIVECF_N),
+		.RFS(MSRFS),
 		
 		.EA(SSHA),
 		.EDI(SSHDI),
@@ -366,7 +397,9 @@ module Saturn (
 		.SCKO(),
 		.SCKI(1'b1),
 		
-		.MD(6'b001000)
+		.MD(6'b001000),
+		
+		.FAST(FAST)
 `ifdef DEBUG
 		,
 		.DBG_REGN('0),
@@ -376,7 +409,7 @@ module Saturn (
 `endif
 	);
 	
-	SH7604 SSH
+	SH7604 #(.UBC_DISABLE(1), .SCI_DISABLE(1), .BUS_AREA_TIMIMG({RAMH_SLOW,3'b111}), .BUS_SIZE_BYTE_DISABLE(1)) SSH
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
@@ -432,7 +465,9 @@ module Saturn (
 		.SCKO(),
 		.SCKI(1'b1),
 		
-		.MD(6'b101000)
+		.MD(6'b101000),
+		
+		.FAST(FAST)
 `ifdef DEBUG
 		,
 		.DBG_REGN('0),
@@ -444,6 +479,29 @@ module Saturn (
 	
 	assign MSHIRL_N  = CIRL_N;
 	assign SSHIRL_N  = {1'b1,BIRL,1'b1};
+	
+	bit [31:0] OPEN_BUS;
+	always @(posedge CLK or negedge RST_N) begin
+	bit         MSHDQM_N_OLD;
+	
+		if (!RST_N) begin
+			OPEN_BUS <= '1;
+		end else if (!SYSRES_N) begin
+			
+		end else begin
+			MSHDQM_N_OLD <= &MSHDQM_N;
+			if (&MSHDQM_N_OLD & MSHDQM_N_OLD) begin
+				if (!MSHDQM_N[3]) OPEN_BUS[31:24] <= MSHDO[31:24];
+				if (!MSHDQM_N[2]) OPEN_BUS[23:16] <= MSHDO[23:16];
+				if (!MSHDQM_N[1]) OPEN_BUS[15: 8] <= MSHDO[15: 8];
+				if (!MSHDQM_N[0]) OPEN_BUS[ 7: 0] <= MSHDO[ 7: 0];
+			end
+			
+			if (!MSHRD_N && MSHWAIT_N) begin
+				OPEN_BUS <= MSHDI;
+			end
+		end
+	end
 
 	assign MSHDI     = CDO;
 	assign MSHWAIT_N = CWAIT_N & (MEM_WAIT_N | (MSHCS3_N & DRAMCE_N & ROMCE_N & SRAMCE_N));
@@ -451,9 +509,16 @@ module Saturn (
 	
 	assign CA       = MSHA[24:0];
 	assign CDO      = !MSHCS3_N || !DRAMCE_N || !ROMCE_N || !SRAMCE_N ? MEM_DI :
-                     !SMPCCE_N                                       ? {4{SMPC_DO}} :
-							SCU_DO;
-	assign CDI      = MSHDO;
+`ifdef STV_BUILD
+                     !STVIO_CS_N                                     ? MEM_DI :
+`endif
+                     !SMPCCE_N                                       ? {16'h0000,8'hFF,SMPC_DO} :
+							!MSHCS1_N || !MSHCS2_N || !MSHIVECF_N           ? SCU_DO :
+							OPEN_BUS;
+	assign CDI      = {!MSHDQM_N[3] ? MSHDO[31:24] : OPEN_BUS[31:24],
+	                   !MSHDQM_N[2] ? MSHDO[23:16] : OPEN_BUS[23:16],
+							 !MSHDQM_N[1] ? MSHDO[15: 8] : OPEN_BUS[15: 8],
+							 !MSHDQM_N[0] ? MSHDO[ 7: 0] : OPEN_BUS[ 7: 0]};
 	assign CBS_N    = MSHBS_N;
 	assign CCS0_N   = MSHCS0_N;
 	assign CCS1_N   = MSHCS1_N;
@@ -468,17 +533,23 @@ module Saturn (
 	
 	
 	assign ADI      = !ACS0_N || !ACS1_N ? CART_DO  : 
-	                  !ACS2_N            ? CD_DO    : 16'hFFFF;
+`ifndef STV_BUILD
+	                  !ACS2_N            ? CD_DO    : 
+`endif
+							16'hFFFF;
+`ifndef STV_BUILD
 	assign AWAIT_N  = YGR019_AWAIT_N & CART_AWAIT_N;
+`else
+	assign AWAIT_N  = CART_AWAIT_N;
+`endif
 	assign AIRQ_N   = ARQT_N;
 	
 	assign BDI      = !BCS1_N ? VDP1_DO :
 	                  !BCS2_N ? VDP2_DO :
 							!BCSS_N ? SCSP_DO : 16'h0000;
-	assign IRQL_N   = 1;
 
 	bit DBG_ABUS_END;
-	SCU SCU
+	SCU #(RAMH_SLOW) SCU
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
@@ -509,6 +580,8 @@ module Saturn (
 		.ECRD_WR_N(ECRD_WR_N),
 		.ECCS3_N(ECCS3_N),
 		.ECRD_N(ECRD_N),
+		.ECBURST(ECBURST),
+		.ECRFS(ECRFS),
 		.ECWAIT_N(ECWAIT_N),
 		
 		.AA(AA),
@@ -540,12 +613,14 @@ module Saturn (
 		.BRDY2_N(BRDY2_N),
 		.IRQV_N(IRQV_N),
 		.IRQH_N(IRQH_N),
-		.IRQL_N(IRQL_N),
+		.IRQL_N(EXL_N),
 		.BCSS_N(BCSS_N),
 		.BRDYS_N(BRDYS_N),
 		.IRQS_N(IRQS_N),
 	
-		.MIREQ_N(MIRQ_N)
+		.MIREQ_N(MIRQ_N),
+		
+		.FAST(FAST)
 	);
 	
 	
@@ -588,12 +663,15 @@ module Saturn (
 		.DCE_N(DRAMCE_N),
 		.DOE_N(),
 		.DWE_N(),
+		.DWAIT_N(MEM_WAIT_N),
 		
 		.ROMCE_N(ROMCE_N),
 		.SRAMCE_N(SRAMCE_N),
 		.SMPCCE_N(SMPCCE_N),
 		.MOE_N(),
-		.MWR_N(MWR_N)
+		.MWR_N(MWR_N),
+		
+		.FAST(FAST)
 	);
 	
 	assign MEM_A     = CA[24:0];
@@ -604,31 +682,112 @@ module Saturn (
 	assign SRAM_CS_N = SRAMCE_N;
 	assign RAML_CS_N = DRAMCE_N;
 	assign RAMH_CS_N = MSHCS3_N;
+	assign RAMH_BURST = ECBURST;
+	assign RAMH_RFS = MSRFS | ECRFS;
+`ifdef STV_BUILD
+	assign STVIO_CS_N = ~(CA >= 25'h0400000 && CA <= 25'h040007F && ~CCS0_N);
+`endif
 	
 	
+`ifndef STV_BUILD
+	bit MRES_N;
+	bit CE32K;
 	always @(posedge CLK or negedge RST_N) begin
+		bit  [ 7: 0] CLK_DIV;
+		
 		if (!RST_N) begin
-			DBG_WAIT_CNT <= '0;
-			DBG_HOOK <= 0;
-		end else if (SYS_CE_R) begin
-			DBG_WAIT_CNT <= DBG_WAIT_CNT + 8'd1;
-			if (!CRD_N || !CDQM_N[0] || !CDQM_N[1] || !CDQM_N[2] || !CDQM_N[3]) begin
-				DBG_WAIT_CNT <= 8'd0;
+			MRES_N <= 0;
+			CLK_DIV <= '0;
+		end else begin
+			if (SMPC_CE) begin
+				MRES_N <= 1;
+				
+				CE32K <= 0;
+				CLK_DIV <= CLK_DIV + 8'd1;
+				if (CLK_DIV == 8'd121) begin
+					CLK_DIV <= '0;
+					CE32K <= 1;
+				end
 			end
-			if (CA == 25'h0012B0 && !CRD_N && !CCS3_N) DBG_HOOK <= 1;
 		end
 	end
 	
+	SMPC #("rtl/Saturn/SMPC/smpc.mif") SMPC
+	(
+		.CLK(CLK),
+		.RST_N(RST_N),
+		.EN(1'b1),
+		
+		.CE(SMPC_CE),
+		.CE32K(CE32K & SMPC_CE),
+		
+		.RESET_N(MRES_N),
+		
+		.A(CA[6:1]),
+		.DBI(CDI[7:0]),
+		.DBO(SMPC_DO),
+		.CS_N(SMPCCE_N),
+		.RW_N(MWR_N),
+		
+		.D0(MIRQ_N),
+		.D1(1'b1),
+		.D2(1'b0),
+		.D3(SRES_N),
+		.D4(SNDRES_N),
+		.D5(SYSRES_N),
+		.D6(MSHRES_N),
+		.D7(MSHNMI_N),
+		.D8(SSHRES_N),
+		.D9(SSHNMI_N),
+		.D10(SMPC_DOTSEL),
+		.D13_INT0(1'b1),
+		
+		.R01_INT2(IRQV_N),
+		
+		.PIOA_I(SMPC_PDR1I),
+		.PIOA_O(SMPC_PDR1O),
+		.PIOA_D(SMPC_DDR1),
+		.PIOB_I(SMPC_PDR2I),
+		.PIOB_O(SMPC_PDR2O),
+		.PIOB_D(SMPC_DDR2),
+		
+		.R5(SMPC_AREA),
+		
+		.R60_D(),
+		.R60_O(),
+		.R60_I(1'b0),
+		
+		.R61_D(),
+		.R61_O(),
+		.R61_I(1'b1),
+		
+		.R62_I(1'b0),
+		.R63_I(1'b0),
+		
+		.R70_I(1'b0),
+		.R71_I(1'b0),
+		.R72_O(CDRES_N),
+		.R73_O(),
+		
+		.EXL_N(EXL_N),
+		
+		.EXT_RTC(RTC)
+	);
+	
+`else
+
 	bit MRES_N;
-	always @(posedge CLK or negedge RST_N) begin
+	always @(posedge CLK or negedge RST_N) begin		
 		if (!RST_N) begin
 			MRES_N <= 0;
 		end else begin
-			if (SMPC_CE) MRES_N <= 1;
+			if (SMPC_CE) begin
+				MRES_N <= 1;
+			end
 		end
 	end
 	
-	SMPC SMPC
+	SMPC_HLE SMPC
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
@@ -636,6 +795,8 @@ module Saturn (
 		
 		.MRES_N(MRES_N),
 		.TIME_SET(TIME_SET),
+		
+		.EXT_RTC(RTC),
 		
 		.AC(SMPC_AREA),	
 		
@@ -648,7 +809,7 @@ module Saturn (
 		.SRES_N(SRES_N),
 		
 		.IRQV_N(IRQV_N),
-		.EXL(1'b0),
+		.EXL_N(EXL_N),
 		
 		.MSHRES_N(MSHRES_N),
 		.MSHNMI_N(MSHNMI_N),
@@ -666,13 +827,9 @@ module Saturn (
 		.DDR1(SMPC_DDR1),
 		.PDR2I(SMPC_PDR2I),
 		.PDR2O(SMPC_PDR2O),
-		.DDR2(SMPC_DDR2),
-		
-		.INPUT_ACT(SMPC_INPUT_ACT),
-		.INPUT_POS(SMPC_INPUT_POS),
-		.INPUT_DATA(SMPC_INPUT_DATA),
-		.INPUT_WE(SMPC_INPUT_WE)
+		.DDR2(SMPC_DDR2)
 	);
+`endif
 	
 	VDP1 VDP1
 	(
@@ -705,6 +862,7 @@ module Saturn (
 		.VRAM_D(VDP1_VRAM_D),
 		.VRAM_WE(VDP1_VRAM_WE),
 		.VRAM_RD(VDP1_VRAM_RD),
+		.VRAM_BLEN(VDP1_VRAM_BLEN),
 		.VRAM_Q(VDP1_VRAM_Q),
 		.VRAM_RDY(VDP1_VRAM_RDY),
 		
@@ -721,6 +879,9 @@ module Saturn (
 		.FB1_Q(VDP1_FB1_Q),
 		.FB_RDY(VDP1_FB_RDY),
 		.FB_MODE3(VDP1_FB_MODE3),
+		
+		.FAST(FAST),
+		.BLUR_MESH(BLUR_MESH),
 		
 		.DBG_EXT(DBG_EXT)
 		
@@ -760,6 +921,8 @@ module Saturn (
 		
 		.PAL(PAL),
 		
+		.EXLAT_N(EXL_N),
+		
 		.RA0_A(VDP2_RA0_A),
 		.RA1_A(VDP2_RA1_A),
 		.RA_D(VDP2_RA_D),
@@ -794,8 +957,7 @@ module Saturn (
 		
 		.DBG_EXT(DBG_EXT)
 	);
-	
-	
+
 	bit         SCCE_R;
 	bit         SCCE_F;
 	bit  [23:1] SCA;
@@ -809,13 +971,28 @@ module Saturn (
 	bit   [2:0] SCFC;
 	bit         SCAVEC_N;
 	bit   [2:0] SCIPL_N;
+	
+`ifndef STV_BUILD
+	wire SCSP_RES_N = SYSRES_N;
+	wire SCPU_RES_N = SNDRES_N;
+`else
+	bit STV_SCSP_RES_N,STV_SCPU_RES_N;
+	always @(posedge CLK) begin
+		if (SYS_CE_R) begin
+			STV_SCSP_RES_N <= ~(SMPC_PDR2O[3] | ~SMPC_DDR2[3]);
+			STV_SCPU_RES_N <= ~(SMPC_PDR2O[4] | ~SMPC_DDR2[4]);
+		end
+	end
+	wire SCSP_RES_N = STV_SCSP_RES_N;
+	wire SCPU_RES_N = STV_SCPU_RES_N;
+`endif
 	SCSP SCSP
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
 		.CE(SCSP_CE),
 		
-		.RES_N(SYSRES_N),
+		.RES_N(SCSP_RES_N),
 		
 		.CE_R(SYS_CE_R),
 		.CE_F(SYS_CE_F),
@@ -857,15 +1034,18 @@ module Saturn (
 		.SOUND_L(SOUND_L),
 		.SOUND_R(SOUND_R),
 		
-		.SND_EN(SND_EN),
-		.SLOT_EN(SLOT_EN)
+`ifdef STV_BUILD
+		.STV_SW(STV_SW),
+`endif
+		
+		.SND_EN(SND_EN)
 	);
 	
-	bit M68K_RESETOn;
+	bit M68K_RESO_N;
 	fx68k M68K
 	(
 		.clk(CLK),
-		.extReset(~SNDRES_N | ~M68K_RESETOn),
+		.extReset(~SCPU_RES_N | ~M68K_RESO_N),
 		.pwrUp(~RST_N),
 		.enPhi1(SCCE_R),
 		.enPhi2(SCCE_F),
@@ -896,12 +1076,13 @@ module Saturn (
 		.BERRn(1),
 		.HALTn(1),
 		
-		.oRESETn(M68K_RESETOn)
+		.oRESETn(M68K_RESO_N)
 	);
 
 	
 	
 	//CD
+`ifndef STV_BUILD
 	bit [21:0] SA;
 	bit [15:0] SDI;
 	bit [15:0] SDO;
@@ -1023,7 +1204,9 @@ module Saturn (
 		.CD_AUDIO(CD_AUDIO),
 		
 		.CD_SL(CD_SL),
-		.CD_SR(CD_SR)
+		.CD_SR(CD_SR),
+		
+		.FAST(FAST)
 	);
 	
 	assign SWAIT_N = CD_RAM_RDY;
@@ -1033,16 +1216,30 @@ module Saturn (
 	assign CD_RAM_CS = ~SCS1_N;
 	assign CD_RAM_WE = ~{SWRH_N,SWRL_N};
 	assign CD_RAM_RD = ~SRD_N;
+`else
+	assign ARQT_N = 1;
+	assign {CD_SL,CD_SR} = '0;
+`endif
 	
 	
 	bit  [15: 0] CART_DO;
 	bit          CART_AWAIT_N;
+`ifndef STV_BUILD
 	CART cart 
+`else
+	STV_CART cart 
+`endif
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
 		
+`ifndef STV_BUILD
 		.MODE(CART_MODE),
+`else
+		.STV_5838_MODE(STV_5838_MODE),
+		.STV_5881_MODE(STV_5881_MODE),
+		.STV_BATMAN_MODE(STV_BATMAN_MODE),
+`endif
 		
 		.RES_N(SYSRES_N),
 		
@@ -1069,9 +1266,18 @@ module Saturn (
 		.MEM_WE(CART_MEM_WE),
 		.MEM_RD(CART_MEM_RD),
 		.MEM_RDY(CART_MEM_RDY)
+		
+`ifdef STV_BUILD
+		,
+		.RAX_MEM_A(RAX_MEM_A),
+		.RAX_MEM_DI(RAX_MEM_DI),
+		.RAX_MEM_DO(RAX_MEM_DO),
+		.RAX_MEM_RD(RAX_MEM_RD),
+		.RAX_MEM_WR(RAX_MEM_WR),
+		.RAX_MEM_RDY(RAX_MEM_RDY),
+		.RAX_SOUND_L(RAX_SOUND_L),
+		.RAX_SOUND_R(RAX_SOUND_R)
+`endif
 	);
-	
-	
-	
 	
 endmodule

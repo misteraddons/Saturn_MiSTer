@@ -8,6 +8,7 @@ package SCUDSP_PKG;
 
 	typedef struct packed
 	{
+		bit         RAMR;
 		bit [ 1: 0] RAMS;
 		bit         MULS;
 		bit         RXW;
@@ -17,6 +18,7 @@ package SCUDSP_PKG;
 	
 	typedef struct packed
 	{
+		bit         RAMR;
 		bit [ 1: 0] RAMS;
 		bit [ 1: 0] ACS;
 		bit         RYW;
@@ -29,6 +31,7 @@ package SCUDSP_PKG;
 		bit         IMMS;
 		bit [ 1: 0] IMMT;		//Immadiate type (8/25/19)
 		bit         ALUS;
+		bit         RAMR;
 		bit [ 1: 0] RAMS;
 		bit         RXW;
 		bit         PW;
@@ -41,6 +44,7 @@ package SCUDSP_PKG;
 		bit [ 3: 0] RAMW;
 		bit [ 3: 0] CTW;
 		bit [ 3: 0] CTI;
+		bit [ 3: 0] DCTI;
 	} D1BusInst_t;
 	
 	typedef struct packed
@@ -78,9 +82,9 @@ package SCUDSP_PKG;
 	} DecInst_t;
 	
 	parameter DecInst_t DECINST_RESET = '{1'b0,
-	                                  {2'b00, 1'b0, 1'b0, 1'b0, 4'b0000},
-	                                  {2'b00, 2'b00, 1'b0, 1'b0, 4'b0000},
-										       {1'b0, 2'b00, 1'b0, 2'b00, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 4'b0000, 4'b0000, 4'b0000},
+	                                  {1'b0, 2'b00, 1'b0, 1'b0, 1'b0, 4'b0000},
+	                                  {1'b0, 2'b00, 2'b00, 1'b0, 1'b0, 4'b0000},
+										       {1'b0, 2'b00, 1'b0, 1'b0, 2'b00, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 4'b0000, 4'b0000, 4'b0000, 4'b0000},
 										       1'b0,
 												 {1'b0, 1'b0, 4'b0000, 1'b0, 4'b0000, 2'b00/*, 3'b000*/, 1'b0, 2'b00, 4'b0000/*, 1'b0*/},
 												 {1'b0, 1'b0, 1'b0, 1'b0}};
@@ -93,32 +97,37 @@ package SCUDSP_PKG;
 			4'b0000,4'b0001,4'b0010,4'b0011: begin
 				di.ALU = |IC[29:26];
 				
-				di.XBUS.RAMS = IC[21:20];
 				di.XBUS.MULS = ~IC[23];
 				di.XBUS.RXW = IC[25];
 				di.XBUS.PW = IC[24];
-				case (IC[21:20])
-					2'b00: di.XBUS.CTI[0] = |IC[25:23] & IC[22];
-					2'b01: di.XBUS.CTI[1] = |IC[25:23] & IC[22];
-					2'b10: di.XBUS.CTI[2] = |IC[25:23] & IC[22];
-					2'b11: di.XBUS.CTI[3] = |IC[25:23] & IC[22];
-				endcase
+				di.XBUS.RAMS = IC[21:20];
+				if (IC[25:23] >= 3'b011) begin
+					di.XBUS.RAMR = 1;
+					case (IC[21:20])
+						2'b00: di.XBUS.CTI[0] = IC[22];
+						2'b01: di.XBUS.CTI[1] = IC[22];
+						2'b10: di.XBUS.CTI[2] = IC[22];
+						2'b11: di.XBUS.CTI[3] = IC[22];
+					endcase
+				end
 				
-				di.YBUS.RAMS = IC[15:14];
 				di.YBUS.ACS = IC[18:17];
 				di.YBUS.RYW = IC[19];
 				di.YBUS.ACW = |IC[18:17];
-				case (IC[15:14])
-					2'b00: di.YBUS.CTI[0] = |IC[19:17] & IC[16];
-					2'b01: di.YBUS.CTI[1] = |IC[19:17] & IC[16];
-					2'b10: di.YBUS.CTI[2] = |IC[19:17] & IC[16];
-					2'b11: di.YBUS.CTI[3] = |IC[19:17] & IC[16];
-				endcase
+				di.YBUS.RAMS = IC[15:14];
+				if (IC[19:17] >= 3'b011) begin
+					di.YBUS.RAMR = 1;
+					case (IC[15:14])
+						2'b00: di.YBUS.CTI[0] = IC[16];
+						2'b01: di.YBUS.CTI[1] = IC[16];
+						2'b10: di.YBUS.CTI[2] = IC[16];
+						2'b11: di.YBUS.CTI[3] = IC[16];
+					endcase
+				end
 				
 				di.D1BUS.IMMS = ~IC[13] & IC[12];
 				di.D1BUS.IMMT = 2'b00;
 				di.D1BUS.ALUS = IC[13] & IC[12] & (IC[3:0] == 4'h9 | IC[3:0] == 4'hA);
-				di.D1BUS.RAMS = IC[1:0];
 				case (IC[11:8])
 					4'b0000: di.D1BUS.RAMW[0] = IC[12];
 					4'b0001: di.D1BUS.RAMW[1] = IC[12];
@@ -136,18 +145,22 @@ package SCUDSP_PKG;
 					4'b1111: di.D1BUS.CTW[3] = IC[12];
 					default:;
 				endcase
-				case (IC[1:0])
-					2'b00: di.D1BUS.CTI[0] = &IC[13:12] & ~IC[3] & IC[2];
-					2'b01: di.D1BUS.CTI[1] = &IC[13:12] & ~IC[3] & IC[2];
-					2'b10: di.D1BUS.CTI[2] = &IC[13:12] & ~IC[3] & IC[2];
-					2'b11: di.D1BUS.CTI[3] = &IC[13:12] & ~IC[3] & IC[2];
-				endcase
-				case (IC[9:8])
-					2'b00: di.D1BUS.CTI[0] = |IC[13:12] & ~IC[11] & ~IC[10];
-					2'b01: di.D1BUS.CTI[1] = |IC[13:12] & ~IC[11] & ~IC[10];
-					2'b10: di.D1BUS.CTI[2] = |IC[13:12] & ~IC[11] & ~IC[10];
-					2'b11: di.D1BUS.CTI[3] = |IC[13:12] & ~IC[11] & ~IC[10];
-				endcase
+				di.D1BUS.RAMR = IC[13] & IC[12] & ~IC[3];
+				di.D1BUS.RAMS = IC[1:0];
+				if (IC[13:12] == 2'b11 && IC[3:2] == 2'b01)
+					case (IC[1:0])
+						2'b00: di.D1BUS.CTI[0] = 1;
+						2'b01: di.D1BUS.CTI[1] = 1;
+						2'b10: di.D1BUS.CTI[2] = 1;
+						2'b11: di.D1BUS.CTI[3] = 1;
+					endcase
+				if ((IC[13:12] == 2'b01 || IC[13:12] == 2'b11) && IC[11:10] == 2'b00)
+					case (IC[9:8])
+						2'b00: di.D1BUS.DCTI[0] = 1;
+						2'b01: di.D1BUS.DCTI[1] = 1;
+						2'b10: di.D1BUS.DCTI[2] = 1;
+						2'b11: di.D1BUS.DCTI[3] = 1;
+					endcase
 			end
 			
 			4'b1000,4'b1001,4'b1010,4'b1011: begin
@@ -178,18 +191,20 @@ package SCUDSP_PKG;
 			4'b1100: begin
 				di.DMA.ST = 1;
 				di.DMA.DIR = IC[12];
-				case (IC[9:8])
-					2'b00: di.DMA.RAMW[0] = ~IC[10] & ~IC[12];
-					2'b01: di.DMA.RAMW[1] = ~IC[10] & ~IC[12];
-					2'b10: di.DMA.RAMW[2] = ~IC[10] & ~IC[12];
-					2'b11: di.DMA.RAMW[3] = ~IC[10] & ~IC[12];
+				case (IC[10:8])
+					3'b000: di.DMA.RAMW[0] = ~IC[12];
+					3'b001: di.DMA.RAMW[1] = ~IC[12];
+					3'b010: di.DMA.RAMW[2] = ~IC[12];
+					3'b011: di.DMA.RAMW[3] = ~IC[12];
+					3'b100: di.DMA.PRGW = ~IC[12];
+					default:;
 				endcase
-				di.DMA.PRGW = IC[10] & ~IC[12];
-				case (IC[9:8])
-					2'b00: di.DMA.RAMR[0] = ~IC[10] & IC[12];
-					2'b01: di.DMA.RAMR[1] = ~IC[10] & IC[12];
-					2'b10: di.DMA.RAMR[2] = ~IC[10] & IC[12];
-					2'b11: di.DMA.RAMR[3] = ~IC[10] & IC[12];
+				case (IC[10:8])
+					3'b000: di.DMA.RAMR[0] = ~IC[10] & IC[12];
+					3'b001: di.DMA.RAMR[1] = ~IC[10] & IC[12];
+					3'b010: di.DMA.RAMR[2] = ~IC[10] & IC[12];
+					3'b011: di.DMA.RAMR[3] = ~IC[10] & IC[12];
+					default:;
 				endcase
 				di.DMA.RAMS = IC[9:8];
 //				di.DMA.ADDI = IC[17:15];

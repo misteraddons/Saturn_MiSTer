@@ -174,16 +174,16 @@ package VDP1_PKG;
 	
 	typedef struct packed
 	{
-		bit [10: 0] X;
-		bit [10: 0] Y;
+		bit [11: 0] X;
+		bit [11: 0] Y;
 	} Coord_t;
 	parameter Coord_t COORD_NULL = {11'h000,11'h000};
 	
 	
 	typedef struct packed
 	{
-		bit [11: 0] X;
-		bit [11: 0] Y;
+		bit [12: 0] X;
+		bit [12: 0] Y;
 	} Vertex_t;
 	parameter Vertex_t VERT_NULL = {12'h000,12'h000};
 	
@@ -236,6 +236,31 @@ package VDP1_PKG;
 		return ADDR;
 	endfunction
 	
+	function bit [15:0] GetSprData(input bit [15:0] DATA, input bit [2:0] CM, input bit [1:0] OFFSX);
+		bit [15:0] D;
+		
+		case (CM)
+			3'b000,
+			3'b001:
+				case (OFFSX)
+					2'b00: D = {12'h000,DATA[15:12]};
+					2'b01: D = {12'h000,DATA[11: 8]};
+					2'b10: D = {12'h000,DATA[ 7: 4]};
+					2'b11: D = {12'h000,DATA[ 3: 0]};
+				endcase
+			3'b010,
+			3'b011,
+			3'b100:
+				case (OFFSX[0])
+					1'b0: D = {8'h00,DATA[15: 8]};
+					1'b1: D = {8'h00,DATA[ 7: 0]};
+				endcase
+			default: D = DATA;
+		endcase
+
+		return D;
+	endfunction
+	
 	typedef struct packed
 	{
 		bit [15: 0] C;
@@ -244,27 +269,17 @@ package VDP1_PKG;
 	} Pattern_t;
 	parameter Pattern_t PATTERN_NULL = {16'h0000,1'b0,1'b0};
 	
-	function Pattern_t GetPattern(input bit [15:0] DATA, input bit [2:0] CM, input bit [1:0] OFFSX);
+	function Pattern_t GetPattern(input bit [15:0] DATA, input bit [2:0] CM);
 		bit [15:0] C;
 		bit        TP;
 		bit        EC;
 		
 		case (CM)
 			3'b000,
-			3'b001:
-				case (OFFSX)
-					2'b00: begin C = {12'h000,DATA[15:12]}; TP = ~|DATA[15:12]; EC = &DATA[15:12]; end
-					2'b01: begin C = {12'h000,DATA[11: 8]}; TP = ~|DATA[11: 8]; EC = &DATA[11: 8]; end
-					2'b10: begin C = {12'h000,DATA[ 7: 4]}; TP = ~|DATA[ 7: 4]; EC = &DATA[ 7: 4]; end
-					2'b11: begin C = {12'h000,DATA[ 3: 0]}; TP = ~|DATA[ 3: 0]; EC = &DATA[ 3: 0]; end
-				endcase
+			3'b001: begin C = {12'h000,DATA[3:0]}; TP = ~|DATA[3:0]; EC = &DATA[3:0]; end
 			3'b010,
 			3'b011,
-			3'b100:
-				case (OFFSX[1])
-					1'b0: begin C = {8'h00,DATA[15: 8]}; TP = ~|DATA[15: 8]; EC = &DATA[15: 8]; end
-					1'b1: begin C = {8'h00,DATA[ 7: 0]}; TP = ~|DATA[ 7: 0]; EC = &DATA[ 7: 0]; end
-				endcase
+			3'b100: begin C = {8'h00,DATA[7:0]}; TP = ~|DATA[7:0]; EC = &DATA[7:0]; end
 			default: begin C = DATA; TP = ~DATA[15]; EC = (DATA == 16'h7FFF); end
 		endcase
 
@@ -277,6 +292,38 @@ package VDP1_PKG;
 		bit [ 4: 0] G;
 		bit [ 4: 0] R;
 	} RGB_t;
+	
+	typedef struct packed
+	{
+		bit         DIR;
+		bit [ 4: 0] INT;
+		bit [11: 0] FRAC;
+	} ColorFP_t;
+	
+	typedef struct packed
+	{
+		ColorFP_t  B;
+		ColorFP_t  G;
+		ColorFP_t  R;
+	} RGBFP_t;
+	
+	function RGBFP_t RGBItoF(input RGB_t CI);
+		RGBFP_t CF;
+		
+		CF.R = {1'b0,CI.R,12'b000000000000};
+		CF.G = {1'b0,CI.G,12'b000000000000};
+		CF.B = {1'b0,CI.B,12'b000000000000};
+		return CF;
+	endfunction
+	
+	function RGB_t RGBFtoI(input RGBFP_t CF);
+		RGB_t CI;
+		
+		CI.R = CF.R.INT;
+		CI.G = CF.G.INT;
+		CI.B = CF.B.INT;
+		return CI;
+	endfunction
 	
 	function RGB_t ColorHalf(input RGB_t CA);
 		RGB_t CH;
@@ -343,11 +390,15 @@ package VDP1_PKG;
 		return {MSB,S};
 	endfunction
 
-	function bit [10:0] Abs(input bit [11:0] C);
-		bit [11:0] abs; 
+	function bit [12:0] SDiv2(input bit [12:0] C);
+		return {C[12],C[12:1]};
+	endfunction
+	
+	function bit [11:0] Abs(input bit [12:0] C);
+		bit [12:0] abs; 
 		
 		abs = $signed(C) >= 0 ? $signed(C) : -$signed(C);
-		return abs[10:0];
+		return abs[11:0];
 	endfunction
 	
 endpackage

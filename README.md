@@ -9,19 +9,7 @@
 
 ## Status
 
-Current status is WIP/Beta
+The core has matured substantially, with many games tested over the course of development.
 
-Known issues:
+Known issues and limitations are tracked in this repository's issue list rather than in a game-by-game list here.
 
-- 3D Baseball - minor graphic gliches
-- BattleSport - minor graphic gliches
-- Galaxy Fight - minor graphic gliches (VDP2 screen in hires mode)
-- Robo Pit - minor graphic gliches (gouroud shadow)
-- Space Jam - freeze in demo
-- Tenchi Muyou! Rensa Hitsuyou (JP) - graphic gliches (VDP2 screen)
-- Thunder Force V (JP) - graphic gliches (VDP2 screen in hires mode)
-- X-Men vs. Street Fighter (JP) - freeze
-- Battle Monsters (EU) - graphic gliches
-- Dragon Ball Z (EU) - freeze
-
-A lot of games have sound issues.

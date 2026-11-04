@@ -10,7 +10,11 @@ package VDP2_PKG;
 		bit         UNUSED2;
 		bit [ 2: 0] HRESO;
 	} TVMD_t;
+`ifdef LIGHT_SATURN
+	parameter bit [15:0] TVMD_MASK = 16'h81F3;
+`else
 	parameter bit [15:0] TVMD_MASK = 16'h81F7;
+`endif
 	
 	typedef struct packed	//RW,180002
 	{
@@ -1166,6 +1170,8 @@ package VDP2_PKG;
 		bit         LZMX;
 		bit         VCSC;
 		bit [ 1: 0] LSS;
+		bit         MZE;
+		bit [18: 1] LWTA;
 		bit         TPON;
 		bit         ON;
 		bit [ 2: 0] CAOS;
@@ -1189,6 +1195,7 @@ package VDP2_PKG;
 		bit [ 2: 0] BMP;
 		bit         BMPR;
 		bit         BMCC;
+		bit         MZE;
 		bit         TPON;
 		bit         ON;
 		bit [ 2: 0] CAOS;
@@ -1210,6 +1217,7 @@ package VDP2_PKG;
 		bit [ 1: 0] KMD;
 		bit [ 2: 0] KTAOS;
 		bit         KDBS;
+		bit         KLCE;
 		bit [ 1: 0] PLSZ;
 		bit [ 1: 0] OVR;
 		bit [15: 0] OVPNR;
@@ -1337,15 +1345,25 @@ package VDP2_PKG;
 		S[2].LSCY = '0;
 		S[3].LSCY = '0;
 		
+		S[0].LZMX = REGS.SCRCTL.N0LZMX;
+		S[1].LZMX = REGS.SCRCTL.N1LZMX;
+		S[2].LZMX = '0;
+		S[3].LZMX = '0;
+		
 		S[0].LSS = REGS.SCRCTL.N0LSS;
 		S[1].LSS = REGS.SCRCTL.N1LSS;
 		S[2].LSS = '0;
 		S[3].LSS = '0;
 		
-		S[0].LZMX = REGS.SCRCTL.N0LZMX;
-		S[1].LZMX = REGS.SCRCTL.N1LZMX;
-		S[2].LZMX = '0;
-		S[3].LZMX = '0;
+		S[0].MZE = REGS.MZCTL.N0MZE;
+		S[1].MZE = REGS.MZCTL.N1MZE;
+		S[2].MZE = REGS.MZCTL.N2MZE;
+		S[3].MZE = REGS.MZCTL.N3MZE;
+		
+		S[0].LWTA = {REGS.LWTA0U.WxLWTA,REGS.LWTA0L.WxLWTA};
+		S[1].LWTA = {REGS.LWTA1U.WxLWTA,REGS.LWTA1L.WxLWTA};
+		S[2].LWTA = '0;
+		S[3].LWTA = '0;
 		
 		S[0].TPON = REGS.BGON.N0TPON;
 		S[1].TPON = REGS.BGON.N1TPON;
@@ -1422,10 +1440,13 @@ package VDP2_PKG;
 		S[1].BMP = REGS.BMPNA.N0BMP;
 		
 		S[0].BMPR = REGS.BMPNB.R0BMPR;
-		S[1].BMPR = REGS.BMPNA.N1BMPR;
+		S[1].BMPR = REGS.BMPNA.N0BMPR;
 		
 		S[0].BMCC = REGS.BMPNB.R0BMCC;
-		S[1].BMCC = REGS.BMPNA.N1BMCC;
+		S[1].BMCC = REGS.BMPNA.N0BMCC;
+		
+		S[0].MZE = REGS.MZCTL.R0MZE;
+		S[1].MZE = REGS.MZCTL.N0MZE;
 		
 		S[0].ON = REGS.BGON.R0ON;
 		S[1].ON = REGS.BGON.R1ON;
@@ -1440,7 +1461,7 @@ package VDP2_PKG;
 		S[1].PRIN = REGS.PRINA.N0PRIN;
 		
 		S[0].SPRM = REGS.SFPRMD.R0SPRM;
-		S[1].SPRM = REGS.SFPRMD.N1SPRM;
+		S[1].SPRM = REGS.SFPRMD.N0SPRM;
 		
 		S[0].COEN = REGS.CLOFEN.R0COEN;
 		S[1].COEN = REGS.CLOFEN.N0COEN;
@@ -1455,7 +1476,7 @@ package VDP2_PKG;
 		S[1].CCRT = REGS.CCRNA.N0CCRT;
 		
 		S[0].SCCM = REGS.SFCCMD.R0SCCM;
-		S[1].SCCM = REGS.SFCCMD.N1SCCM;
+		S[1].SCCM = REGS.SFCCMD.N0SCCM;
 		
 		return S;
 	endfunction
@@ -1511,6 +1532,9 @@ package VDP2_PKG;
 		S[0].KDBS = REGS.KTCTL.RAKDBS;
 		S[1].KDBS = REGS.KTCTL.RBKDBS;
 		
+		S[0].KLCE = REGS.KTCTL.RAKLCE;
+		S[1].KLCE = REGS.KTCTL.RBKLCE;
+		
 		S[0].PLSZ = REGS.PLSZ.RAPLSZ;
 		S[1].PLSZ = REGS.PLSZ.RBPLSZ;
 		
@@ -1562,17 +1586,14 @@ package VDP2_PKG;
 	{
 		bit         PN; 
 		bit         CH; 
-		bit         VS; 
-//		bit         LS; 
-		bit         CPUA; 
-		bit         CPUD; 
+		bit         VS;  
 		bit [ 1: 0] Nx;
 	} NVRAMAccess_t;
 	
 	typedef struct packed
 	{
 		bit         TP;
-		bit [ 7: 0] LCSD;
+		bit [ 6: 0] LCSD;
 		bit [15: 0] INT;
 		bit [15: 0] FRAC;
 	} CT_t;
@@ -1612,6 +1633,7 @@ package VDP2_PKG;
 	typedef bit [ 1: 0] RxCHS_t[2];
 	typedef bit [ 2: 0] RxCELLX_t[2];
 	typedef bit [ 1: 0] RxCTS_t[2];
+	typedef bit         RxCTEN_t[2];
 	
 	typedef struct
 	{
@@ -1631,10 +1653,7 @@ package VDP2_PKG;
 		bit [ 1: 0] NxA1VS;
 		bit [ 1: 0] NxB0VS;
 		bit [ 1: 0] NxB1VS;
-		bit         NxA0CPU;
-		bit         NxA1CPU;
-		bit         NxB0CPU;
-		bit         NxB1CPU;
+		NxPNEN_t    NxPN_FETCH;
 		bit [ 1: 0] RxA0PN;
 		bit [ 1: 0] RxA1PN;
 		bit [ 1: 0] RxB0PN;
@@ -1649,6 +1668,8 @@ package VDP2_PKG;
 		bit [ 1: 0] RxB1CT;
 		bit [ 1: 0] RxCRCT;
 		bit [ 1: 0] RxCTTP;
+		bit         AxNA;
+		bit         BxNA;
 		bit         LS;
 		bit   [2:0] LS_POS;
 		bit         LW;
@@ -1688,26 +1709,21 @@ package VDP2_PKG;
 		RxCELLX_t   RxCELLX;
 		bit [ 1: 0] RxCT;
 		RxCTS_t     RxCTS;
+		RxCTEN_t    RxCT_EN;
 		bit [ 1: 0] RxCRCT;
 		bit [ 1: 0] RxCTTP;
 		bit [ 1: 0] RxOVR;
 	} RBGState_t;
 	typedef RBGState_t RBGPipeline_t [4];
 	
-	typedef PN_t        NxPND_t[6];
-	typedef NxPND_t     PNPipe_t [6];
-	
-	typedef ScrollData_t NxVS_t [2];
-	typedef NxVS_t      VSPipe_t [5];
+	typedef PN_t        NxPND_t[8];
+	typedef NxPND_t     PNPipe_t [5];
 	
 	typedef bit [31: 0] NxCHD_t[4];
 	typedef NxCHD_t     CHPipe_t [2];
 	
 	typedef PN_t        RxPND_t[2];
 	typedef RxPND_t     RPNPipe_t [5];
-	
-//	typedef bit [31: 0] RxCHD_t[2];
-//	typedef RxCHD_t     RCHPipe_t [4];
 	
 	typedef CT_t        RxCTD_t[2];
 	typedef RxCTD_t     RCTPipe_t [4];
@@ -1749,10 +1765,12 @@ package VDP2_PKG;
 	                             input bit [8:6] NxMP, input bit [5:0] NxMPn[4], 
 										  input bit [1:0] NxPLSZ, input bit NxCHSZ, input bit NxPNB, input bit NxZMHF, input bit NxZMQT);
 		bit  [19: 1] addr;
+		bit  [ 1: 0] ZM_MASK;
 		bit  [10: 0] OFFX;
 		bit  [ 8: 0] map_addr;
 		
-		OFFX = NxOFFX + {NxZMHF&NxPN_CNT[0],3'b000};
+		ZM_MASK = {NxZMQT,NxZMQT|NxZMHF};
+		OFFX = NxOFFX + {NxPN_CNT&ZM_MASK,3'b000};
 		case (NxPLSZ)
 			2'b00: map_addr = {NxMP,NxMPn[{NxOFFY[ 9],OFFX[ 9]}][5:0]};
 			2'b01: map_addr = {NxMP,NxMPn[{NxOFFY[ 9],OFFX[10]}][5:1],OFFX[9]};
@@ -1769,9 +1787,10 @@ package VDP2_PKG;
 		return addr;
 	endfunction
 	
-	function bit [19:1] NxCHAddr(input PN_t NxPN[2], input bit [2:0] NxCH_CNT, input bit [10:0] NxOFFX, input bit [10:0] NxOFFY, 
+	function bit [19:1] NxCHAddr(input PN_t NxPN[4], input bit [2:0] NxCH_CNT, input bit [10:0] NxOFFX, input bit [10:0] NxOFFY, 
 	                             input bit [2:0] NxCHCN, input bit NxCHSZ, input bit NxZMHF, input bit NxZMQT);
 		bit  [19: 1] addr;
+		bit  [ 1: 0] ZM_MASK;
 		PN_t         PN;
 		bit  [10: 0] OFFX;
 		bit  [ 4: 0] cell_offs;
@@ -1779,15 +1798,16 @@ package VDP2_PKG;
 		bit  [ 3: 0] y_offs;
 		bit  [ 2: 0] ch_cnt;
 		
+		ZM_MASK = {NxZMQT,NxZMQT|NxZMHF};
 		case (NxCHCN)
-			3'b000:  PN = NxPN[NxZMHF&NxCH_CNT[0]];	//4bits/dot, 16 colors
-			3'b001:  PN = NxPN[NxZMHF&NxCH_CNT[1]];	//8bits/dot, 256 colors
+			3'b000:  PN = NxPN[      NxCH_CNT[1:0]&ZM_MASK[1:0] ];	//4bits/dot, 16 colors
+			3'b001:  PN = NxPN[{1'b0,NxCH_CNT[1:1]&ZM_MASK[0:0]}];	//8bits/dot, 256 colors
 			default: PN = NxPN[0];
 		endcase
 		
 		case (NxCHCN)
-			3'b000:  OFFX = NxOFFX + {NxZMHF&NxCH_CNT[0],3'b000};
-			3'b001:  OFFX = NxOFFX + {NxZMHF&NxCH_CNT[1],3'b000};
+			3'b000:  OFFX = NxOFFX + {     NxCH_CNT[1:0]&ZM_MASK[1:0],3'b000};
+			3'b001:  OFFX = NxOFFX + {1'b0,NxCH_CNT[1:1]&ZM_MASK[0:0],3'b000};
 			default: OFFX = NxOFFX;
 		endcase
 
@@ -1853,7 +1873,7 @@ package VDP2_PKG;
 		return addr;
 	endfunction
 	
-	function bit [19:1] NxBMAddr(input bit [2:0] NxMP, input bit [2:0] NxCH_CNT, input bit [10:0] NxOFFX, input bit [10:0] NxOFFY, 
+	function bit [19:1] NxBMAddr(input bit [2:0] NxMP, input bit [2:0] NxCH_CNT, input bit [2:0] NxBM_CNT, input bit [10:0] NxOFFX, input bit [10:0] NxOFFY, 
 	                             input bit [2:0] NxCHCN, input bit [1:0] NxBMSZ, input bit NxZMHF, input bit NxZMQT);
 		bit   [19:1] addr;
 		bit   [15:0] offs;
@@ -1866,11 +1886,11 @@ package VDP2_PKG;
 		endcase
 		
 		case (NxCHCN)
-			3'b000: addr = {NxMP,16'b0000000000000000} + {offs[15:0],1'b0   } + {1'b0              ,NxZMHF&NxCH_CNT[0],1'b0};	//4bits/dot, 16 colors
-			3'b001: addr = {NxMP,16'b0000000000000000} + {offs[15:0],2'b00  } + {NxZMHF&NxCH_CNT[1],       NxCH_CNT[0],1'b0};	//8bits/dot, 256 colors
+			3'b000: addr = {NxMP,16'b0000000000000000} + {offs[15:0],1'b0   } + {NxBM_CNT[1:0],1'b0};	//4bits/dot, 16 colors
+			3'b001: addr = {NxMP,16'b0000000000000000} + {offs[15:0],2'b00  } + {NxBM_CNT[1:0],1'b0};	//8bits/dot, 256 colors
 			3'b010,
-			3'b011: addr = {NxMP,16'b0000000000000000} + {offs[15:0],3'b000 } + {NxCH_CNT[1:0],1'b0};	//16bits/dot, 2048/32768 colors
-			3'b100: addr = {NxMP,16'b0000000000000000} + {offs[14:0],4'b0000} + {NxCH_CNT[2:0],1'b0};	//32bits/dot, 16M colors
+			3'b011: addr = {NxMP,16'b0000000000000000} + {offs[15:0],3'b000 } + {NxBM_CNT[1:0],1'b0};	//16bits/dot, 2048/32768 colors
+			3'b100: addr = {NxMP,16'b0000000000000000} + {offs[14:0],4'b0000} + {NxBM_CNT,1'b0};	//32bits/dot, 16M colors
 			default: addr = '0;
 		endcase
 	
@@ -1897,7 +1917,7 @@ package VDP2_PKG;
 		return (res<<DI);
 	endfunction
 	
-	function bit [2:0] NxLSSMask(input bit [1:0] NxLSS);
+	function bit [2:0] NxLSSMask(input bit [1:0] NxLSS, input bit DDI);
 		bit [2:0] mask;
 		
 		case (NxLSS)
@@ -1906,7 +1926,7 @@ package VDP2_PKG;
 			2'b10: mask = 3'b011;
 			2'b11: mask = 3'b111;
 		endcase
-		return mask;
+		return (mask>>DDI);
 	endfunction
 	
 	//Rotation scroll screen
@@ -2012,7 +2032,7 @@ package VDP2_PKG;
 	parameter RotTbl_t ROT_NULL = {SCNST_NULL, SCNST_NULL, SCNST_NULL,
 	                               SCNINC_NULL, SCNINC_NULL, SCNINC_NULL, SCNINC_NULL,
 											 MATR_NULL, MATR_NULL, MATR_NULL, MATR_NULL, MATR_NULL, MATR_NULL,
-											 SCNCRD_NULL, SCNCRD_NULL, SCNCRD_NULL,
+											 SCNCRD_NULL, SCNCRD_NULL, SCNCRD_NULL, 16'h0000,
 											 SCNCRD_NULL, SCNCRD_NULL, SCNCRD_NULL, 16'h0000,
 											 SHIFT_NULL, SHIFT_NULL, 
 											 SCALL_NULL, SCALL_NULL,
@@ -2072,12 +2092,6 @@ package VDP2_PKG;
 		bit [63:0] temp;
 		temp = $signed(a) * $signed(b);
 		return temp[47:16];
-	endfunction
-	
-	function bit [29:0] MultFI(input bit [29:0] a, input bit [29:16] b);
-		bit [43:0] temp;
-		temp = $signed(a) * $signed(b);
-		return {temp[43],temp[28:0]};
 	endfunction
 	
 	function bit [19:1] RxPNAddr(input bit [11:0] RxOFFX, input bit [11:0] RxOFFY,
@@ -2152,11 +2166,12 @@ package VDP2_PKG;
 		return ({RPTA,1'b0} & ~19'h00040) + {RP_POS,1'b0};
 	endfunction
 	
-	function bit [19:1] RxCTAddr(input bit [15:0] RxKAst, input bit [18:0] RxKA, input bit [2:0] RxKTAOS, input bit RxKDBS);
+	function bit [19:1] RxCTAddr(input RotCoord_t RxKAst, input RotAddr_t RxKA, input bit [2:0] RxKTAOS, input bit RxKDBS);
 		bit   [19:1] addr;
 		bit   [18:0] offs;
+		bit   [15:0] frac;
 		
-		offs = {RxKTAOS,RxKAst} + RxKA;
+		{offs,frac} = {RxKTAOS,RxKAst} + RxKA;
 		
 		case (RxKDBS)
 			1'b0: addr = {offs[17:0],1'b0};	//2 words
@@ -2259,10 +2274,10 @@ package VDP2_PKG;
 		4'hF: begin MSB = 1'b0    ; NSD = &DATA[ 7:1] & ~DATA[0]; TPEN = 1;        PR = {1'b0    ,1'b0    ,1'b0    }; CC = {1'b0    ,DATA[ 7],DATA[ 6]}; DC = {3'b000  ,DATA[ 7:0]}; end
 		endcase
 		
-		TP = ~|DATA[14:0];
+		TP = ~((|DATA[14:8] & ~SPCTL.SPTYPE[3]) | |DATA[7:0]);
 		
 		RGB888 = {DATA[14:10],3'b000,DATA[9:5],3'b000,DATA[4:0],3'b000};
-		RGB_TP = TP & TPEN & SPCTL.SPWINEN;
+		RGB_TP = SPCTL.SPTYPE[3] ? TP : TP & TPEN & SPCTL.SPWINEN;
 		
 		MSD = MSB & ~TP &          ~SPCTL.SPWINEN;
 		TSD = MSB &  TP & TPSDSL & ~SPCTL.SPWINEN;
@@ -2284,11 +2299,10 @@ package VDP2_PKG;
 	{
 		bit         PR;	//Priority flag
 		bit         CC;	//Color calculation flag
-		bit         TPON;	//Transparent code enabled
 		bit [ 6: 0] PALN;	//Palette number
-	} DotParam_t;
-	parameter DotParam_t DP_NULL = {1'b0,1'b0,1'b0,7'h00};
-	typedef DotParam_t CellDotsParam_t [8];
+		bit         TP;	//Transparent 
+	} CellParam_t;
+	parameter CellParam_t CDP_NULL = {1'b0,1'b0,7'h00,1'b0};
 	
 	typedef struct packed
 	{
@@ -2302,15 +2316,15 @@ package VDP2_PKG;
 	
 	typedef DotData_t DotsBuffer_t [16];
 	
-	function DotData_t MakeDotData(input bit [31:0] DCC, input DotParam_t DP, input bit [2:0] CHCN);
+	function DotData_t MakeDotData(input bit [31:0] DCC, input CellParam_t CDP, input bit [2:0] CHCN, input bit TPON);
 		bit [23: 0] DC;
 		bit [ 2: 0] NTP;
 		bit         P;
 		bit         TP;
 		
 		case (CHCN)
-			3'b000:  DC = {13'h0000,DP.PALN     ,DCC[3:0]};							//Palette 4bits/dot, 16 colors
-			3'b001:  DC = {13'h0000,DP.PALN[6:4],DCC[7:0]};							//Palette 8bits/dot, 256 colors
+			3'b000:  DC = {13'h0000,CDP.PALN     ,DCC[3:0]};						//Palette 4bits/dot, 16 colors
+			3'b001:  DC = {13'h0000,CDP.PALN[6:4],DCC[7:0]};						//Palette 8bits/dot, 256 colors
 			3'b010:  DC = {13'h0000,DCC[10:0]};											//Palette 16bits/dot, 2048 colors
 			3'b011:  DC = {DCC[14:10],3'b000,DCC[9:5],3'b000,DCC[4:0],3'b000};//RGB 16bits/dot, 32768 colors
 			default: DC = DCC[23:0];														//RGB 32bits/dot, 16M colors
@@ -2318,14 +2332,14 @@ package VDP2_PKG;
 
 		NTP = {|DCC[10:8],|DCC[7:4],|DCC[3:0]};
 		case (CHCN)
-			3'b000:  begin TP = ~(|NTP[0:0] | DP.TPON); P = 1; end	//Palette 4bits/dot, 16 colors
-			3'b001:  begin TP = ~(|NTP[1:0] | DP.TPON); P = 1; end	//Palette 8bits/dot, 256 colors
-			3'b010:  begin TP = ~(|NTP[2:0] | DP.TPON); P = 1; end	//Palette 16bits/dot, 2048 colors
-			3'b011:  begin TP = ~(DCC[15]   | DP.TPON); P = 0; end	//RGB 16bits/dot, 32768 colors
-			default: begin TP = ~(DCC[31]   | DP.TPON); P = 0; end	//RGB 32bits/dot, 16M colors
+			3'b000:  begin TP = CDP.TP | ~(|NTP[0:0] | TPON); P = 1; end	//Palette 4bits/dot, 16 colors
+			3'b001:  begin TP = CDP.TP | ~(|NTP[1:0] | TPON); P = 1; end	//Palette 8bits/dot, 256 colors
+			3'b010:  begin TP = CDP.TP | ~(|NTP[2:0] | TPON); P = 1; end	//Palette 16bits/dot, 2048 colors
+			3'b011:  begin TP = CDP.TP | ~(DCC[15]   | TPON); P = 0; end	//RGB 16bits/dot, 32768 colors
+			default: begin TP = CDP.TP | ~(DCC[31]   | TPON); P = 0; end	//RGB 32bits/dot, 16M colors
 		endcase
 		
-		return {DP.PR, DP.CC, P, TP, DC};
+		return {CDP.PR, CDP.CC, P, TP, DC};
 	endfunction
 	
 	typedef struct packed
@@ -2337,11 +2351,12 @@ package VDP2_PKG;
 		bit         COEN;
 		bit         COSL;
 		bit         SDEN;
+		bit         BOKEN;
 		bit         LCEN;
 		bit         P;
 		bit [23: 0] DC;
 	} ScreenDot_t;
-	parameter ScreenDot_t SD_NULL = {3'b000,1'b0,1'b0,5'b00000,1'b0,1'b0,1'b0,1'b0,1'b0,24'h000000};
+	parameter ScreenDot_t SD_NULL = {3'b000,1'b0,1'b0,5'b00000,1'b0,1'b0,1'b0,1'b0,1'b0,1'b0,24'h000000};
 	
 
 	//Color calculation
@@ -2391,12 +2406,12 @@ package VDP2_PKG;
 	endfunction
 	
 	function DotColor_t ExtColorCalc(input DotColor_t DCSEC, input bit CCENSEC, input DotColor_t DCTHD, input bit PTHD, input bit CCENTHD, input DotColor_t DCFTH, 
-	                                 input bit LCEN, input bit [1:0] CRMD, input bit EXCCEN);
+	                                 input bit LCEN, input bit BOKEN, input bit [1:0] CRMD, input bit EXCCEN);
 		bit RTSEC,RTTHD;
 		DotColor_t TEMP;
 
-		RTSEC = CCENSEC & ~(|CRMD && PTHD) & EXCCEN;
-		RTTHD = CCENTHD & LCEN & EXCCEN;
+		RTSEC = (CCENSEC & ~(|CRMD && PTHD) & EXCCEN) | (BOKEN & ~|CRMD);
+		RTTHD = (CCENTHD & LCEN & EXCCEN) | (BOKEN & ~|CRMD);
 		
 		TEMP.R = ColorCalcExtRatio(DCSEC.R, DCTHD.R, DCFTH.R, RTSEC, RTTHD);
 		TEMP.G = ColorCalcExtRatio(DCSEC.G, DCTHD.G, DCFTH.G, RTSEC, RTTHD);
@@ -2405,12 +2420,12 @@ package VDP2_PKG;
 		return TEMP;
 	endfunction
 	
-	function bit [7:0] ColorOffset(input bit [7:0] C, input bit [8:0] COAx, input bit [8:0] COBx, input bit COEN, input bit COSL);
-		bit [8:0] CAS, CBS;
+	function bit [7:0] ColorOffset(input bit [7:0] C, input bit [8:0] COA, input bit [8:0] COB, input bit COEN, input bit COSL);
+		bit [8:0] CO, CSUM;
 
-		CAS = $signed({1'b0,C}) + $signed(COAx);
-		CBS = $signed({1'b0,C}) + $signed(COBx);
-		return !COEN ? C : !COSL ? CAS[7:0] & ~{8{COAx[8]&CAS[8]}} | {8{~COAx[8]&CAS[8]}} : CBS[7:0] & ~{8{COBx[8]&CBS[8]}} | {8{~COBx[8]&CBS[8]}}; 
+		CO = !COSL ? COA : COB;
+		CSUM = $signed({1'b0,C}) + $signed(CO);
+		return !COEN ? C : CSUM[7:0] & ~{8{CO[8]&CSUM[8]}} | {8{~CO[8]&CSUM[8]}}; 
 	endfunction
 	
 	function bit [7:0] Shadow(input bit [7:0] C, input bit SDEN);
@@ -2451,19 +2466,6 @@ package VDP2_PKG;
 		endcase
 	
 		return LOG ? log_and : log_or;
-	endfunction
-	
-	function bit [19:1] LWAddr(input bit [18:1] WxLWTA, input bit [9:2] LW_OFFS);
-		return {WxLWTA,1'b0} + {LW_OFFS,1'b0};
-	endfunction
-	
-	//
-	function bit [19:1] BSAddr(input bit [18:0] BKTA, input bit [8:0] LINE, input bit BKCLMD);
-		return BKTA + (LINE & {9{BKCLMD}});
-	endfunction
-	
-	function bit [19:1] LNAddr(input bit [18:0] LCTA, input bit [8:0] LINE, input bit LCCLMD);
-		return LCTA + (LINE & {9{LCCLMD}});
 	endfunction
 	
 endpackage
